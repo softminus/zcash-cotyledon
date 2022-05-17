@@ -3,8 +3,7 @@ use zebra_network::init;
 use std::time::Duration;
 use zebra_chain::{chain_tip::NoChainTip, parameters::Network};
 use tokio::{pin, select, sync::oneshot};
-use tower::{builder::ServiceBuilder, util::BoxService};
-
+use tokio::runtime::Runtime;
 
 use std::{
     collections::HashSet,
@@ -18,41 +17,32 @@ use futures::{
     future::{FutureExt, TryFutureExt},
     stream::Stream,
 };
-use tower::{buffer::Buffer, timeout::Timeout, util::BoxService, Service, ServiceExt};
+use tower::{builder::ServiceBuilder, buffer::Buffer, timeout::Timeout, util::BoxService, Service, ServiceExt, service_fn};
 
 use zebra_network as zn;
 use zebra_state as zs;
-
+use zn::Response;
 use zebra_chain::{
     block::{self, Block},
     transaction::UnminedTxId,
 };
 use zebra_network::{
     constants::{ADDR_RESPONSE_LIMIT_DENOMINATOR, MAX_ADDRS_IN_MESSAGE},
-    AddressBook, InventoryResponse,
+    AddressBook, InventoryResponse, Config
 };
 
 
 
 fn main()
 {
-
-    let unused_v4 = "0.0.0.0:0".parse().unwrap();
-
-    let config = Config {
-        initial_mainnet_peers: peers,
-        peerset_initial_target_size: PEERSET_INITIAL_TARGET_SIZE,
-
-        network: Network::Mainnet,
-        listen_addr: unused_v4,
-
-        ..Config::default()
-    };
-
+    let config = Config::default();
+    let rt  = Runtime::new().unwrap();
+    let nil_inbound_service = service_fn(|_| async { Ok(Response::Nil) });
 
     // let inbound = ServiceBuilder::new()
     //     .load_shed()
     //     .buffer(inbound::downloads::MAX_INBOUND_CONCURRENCY)
     //     .service(Inbound::new(setup_rx));
-    init(config, NoChainTip);
+    let x = init(config, nil_inbound_service, NoChainTip);
+    rt.block_on(x);
 }
