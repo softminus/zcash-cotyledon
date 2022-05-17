@@ -1,0 +1,18 @@
+[package]
+name = "zcash-cotyledon"
+version = "0.1.0"
+authors = ["sasha <sasha@zcash>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hyper = { version = "0.14", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
+tower = { version = "0.4.12", features = ["retry", "discover", "load", "load-shed", "timeout", "util", "buffer"] }
+futures = "0.3.21"
+
+
+zebra-network = {git = "https://github.com/ZcashFoundation/zebra", rev = "2f636bf04608ca9b0ad129303482934ed167de7c"}
+zebra-chain = {git = "https://github.com/ZcashFoundation/zebra", rev = "2f636bf04608ca9b0ad129303482934ed167de7c"}
+zebra-state = {git = "https://github.com/ZcashFoundation/zebra", rev = "2f636bf04608ca9b0ad129303482934ed167de7c"}
