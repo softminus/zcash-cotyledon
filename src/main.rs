@@ -1,3 +1,5 @@
+#![feature(type_name_of_val)]
+
 use zebra_network::init;
 
 use std::time::Duration;
@@ -32,17 +34,22 @@ use zebra_network::{
 };
 
 
+// async fn inbound_service (request) {
+//     Ok(Response::Nil)
+// }
+
 
 fn main()
 {
     let config = Config::default();
     let rt  = Runtime::new().unwrap();
-    let nil_inbound_service = service_fn(|_| async { Ok(Response::Nil) });
+    let nil_inbound_service = |x| async move { println!("{}", x); Ok(Response::Nil) };
 
     // let inbound = ServiceBuilder::new()
     //     .load_shed()
     //     .buffer(inbound::downloads::MAX_INBOUND_CONCURRENCY)
     //     .service(Inbound::new(setup_rx));
-    let x = init(config, nil_inbound_service, NoChainTip);
+    let x = init(config, service_fn(nil_inbound_service), NoChainTip);
+    //println!("{}", std::any::type_name_of_val(&nil_inbound_service));
     rt.block_on(x);
 }
