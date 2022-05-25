@@ -228,7 +228,7 @@ async fn main()
     //let nil_inbound_service = |x| async move {println!("{}", x); Ok(Response::Nil) };
 
     let (setup_tx, setup_rx) = oneshot::channel();
-    let inbound = ServiceBuilder::new().service(Inbound::new(setup_rx));
+    let inbound = ServiceBuilder::new().buffer(10).service(Inbound::new(setup_rx));
 
     let (peer_set, address_book) = init(config, inbound, NoChainTip).await;
     //println!("egg {}", std::any::type_name_of_val(&peer_set));
