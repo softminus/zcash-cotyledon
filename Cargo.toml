@@ -7,10 +7,25 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hyper = { version = "0.14", features = ["full"] }
-tokio = { version = "1", features = ["full"] }
-tower = { version = "0.4.12", features = ["retry", "discover", "load", "load-shed", "timeout", "util", "buffer"] }
+bitflags = "1.3.2"
+byteorder = "1.4.3"
+bytes = "1.1.0"
+chrono = "0.4.19"
+hex = "0.4.3"
+lazy_static = "1.4.0"
+ordered-map = "0.4.2"
+pin-project = "1.0.10"
+rand = { version = "0.8.5", package = "rand" }
+regex = "1.5.5"
+serde = { version = "1.0.137", features = ["serde_derive"] }
+thiserror = "1.0.31"
+
 futures = "0.3.21"
+tokio = { version = "1.18.2", features = ["net", "time", "tracing", "macros", "rt-multi-thread"] }
+tokio-stream = { version = "0.1.8", features = ["sync", "time"] }
+tokio-util = { version = "0.7.2", features = ["codec"] }
+tower = { version = "0.4.12", features = ["retry", "discover", "load", "load-shed", "timeout", "util", "buffer"] }
+
 
 
 zebra-network = {git = "https://github.com/ZcashFoundation/zebra", rev = "2f636bf04608ca9b0ad129303482934ed167de7c"}
