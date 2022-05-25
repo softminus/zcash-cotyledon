@@ -20,6 +20,8 @@ use futures::{
     stream::Stream,
 };
 use chrono::Utc;
+use tokio::sync::oneshot::error::TryRecvError;
+
 
 use tower::{builder::ServiceBuilder, buffer::Buffer, timeout::Timeout, util::BoxService, Service, ServiceExt, service_fn};
 
@@ -39,7 +41,6 @@ pub struct InboundSetupData {
     /// A shared list of peer addresses.
     pub address_book: Arc<std::sync::Mutex<AddressBook>>,
 }
-
 
 /// Tracks the internal state of the [`Inbound`] service during setup.
 pub enum Setup {
@@ -67,8 +68,25 @@ pub enum Setup {
 
     /// Setup failed, because the setup channel permanently failed.
     /// The service keeps returning readiness errors for every request.
-    FailedRecv,
+    FailedRecv {
+        /// The original channel error.
+        error: SharedRecvError,
+    },
 }
+
+/// A wrapper around `Arc<TryRecvError>` that implements `Error`.
+#[derive(thiserror::Error, Debug, Clone)]
+#[error(transparent)]
+pub struct SharedRecvError(Arc<TryRecvError>);
+
+impl From<TryRecvError> for SharedRecvError {
+    fn from(source: TryRecvError) -> Self {
+        Self(Arc::new(source))
+    }
+}
+
+
+
 
 
 pub struct Inbound {
@@ -123,17 +141,37 @@ impl Service<zn::Request> for Inbound {
 
                     result = Ok(());
                     Setup::Initialized {
-                        address_book,
+                        address_book
                     }
-                },
-                Err(_) => Setup::FailedInit
+                }
+                Err(TryRecvError::Empty) => {
+                    // There's no setup data yet, so keep waiting for it
+                    result = Ok(());
+                    Setup::Pending { setup }
+                }
+                Err(error @ TryRecvError::Closed) => {
+                    // Mark the service as failed, because setup failed
+                    let error: SharedRecvError = error.into();
+                    result = Err(error.clone().into());
+                    Setup::FailedRecv { error }
+                }
             },
-
             // Make sure previous setups were left in a valid state
             Setup::FailedInit => unreachable!("incomplete previous Inbound initialization"),
             // If setup failed, report service failure
+            Setup::FailedRecv { error } => {
+                result = Err(error.clone().into());
+                Setup::FailedRecv { error }
+            }
             // Clean up completed download tasks, ignoring their results
-            _ => todo!(),
+            Setup::Initialized {
+                address_book,
+            } => {
+                result = Ok(());
+                Setup::Initialized {
+                    address_book,
+                }
+            }
         };
 
         // Make sure we're leaving the setup in a valid state
@@ -181,6 +219,7 @@ impl Service<zn::Request> for Inbound {
                 // cloning the address book. Then sanitize in the future,
                 // after releasing the lock.
                 let peers = address_book.lock().unwrap().clone();
+                println!("OUTISDE THE ASYNC BLOCK; SENDING SOME PEERS! {:?}", peers);
 
                 async move {
                     // Correctness: get the current time after acquiring the address book lock.
@@ -196,10 +235,7 @@ impl Service<zn::Request> for Inbound {
                     //
                     // TODO: replace with div_ceil once it stabilises
                     //       https://github.com/rust-lang/rust/issues/88581
-                    let address_limit = (peers.len() + ADDR_RESPONSE_LIMIT_DENOMINATOR - 1) / ADDR_RESPONSE_LIMIT_DENOMINATOR;
-                    let address_limit = MAX_ADDRS_IN_MESSAGE.min(address_limit);
-                    peers.truncate(address_limit);
-
+                    println!("SENDING SOME PEERS! {:?}", peers);
                     if peers.is_empty() {
                         // We don't know if the peer response will be empty until we've sanitized them.
                         Ok(zn::Response::Nil)
@@ -237,12 +273,6 @@ async fn main()
 
     setup_tx.send(setup_data);
     loop {
-        {
-            let now = Utc::now();
-            let peers = address_book.lock().unwrap().clone();
-            let mut peers = peers.sanitized(now);
-            println!("egg {:?}", peers);
-        }
         std::thread::sleep(Duration::new(1,0));
     }
 
