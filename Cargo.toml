@@ -27,6 +27,8 @@ tokio-util = { version = "0.7.2", features = ["codec"] }
 tower = { version = "0.4.12", features = ["retry", "discover", "load", "load-shed", "timeout", "util", "buffer"] }
 
 
+hyper = { version = "0.14", features = ["full"] }
+
 
 zebra-network = {git = "https://github.com/ZcashFoundation/zebra", rev = "2f636bf04608ca9b0ad129303482934ed167de7c"}
 zebra-chain = {git = "https://github.com/ZcashFoundation/zebra", rev = "2f636bf04608ca9b0ad129303482934ed167de7c"}
