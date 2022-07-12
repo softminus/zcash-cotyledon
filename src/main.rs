@@ -22,7 +22,7 @@ use futures::{
 use chrono::Utc;
 use tokio::sync::oneshot::error::TryRecvError;
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr};
 
 
 use tower::{builder::ServiceBuilder, buffer::Buffer, timeout::Timeout, util::BoxService, Service, ServiceExt, service_fn};
@@ -39,14 +39,62 @@ use zebra_network::{
     AddressBook, InventoryResponse, Config, connect_isolated_tcp_direct, Request
 };
 
+use zebra_network::types::PeerServices;
+use zebra_chain::serialization::DateTime32;
+use std::time::Instant;
+use zebra_network::PeerAddrState;
+use std::thread::sleep;
+use std::net::{SocketAddr, ToSocketAddrs};
+
+
+
+async fn test_a_server(peer_addr: SocketAddr)
+{
+    println!("peer addr is {:?}", peer_addr);
+    let the_connection = connect_isolated_tcp_direct(Network::Mainnet, peer_addr, String::from("/Seeder-and-feeder:0.0.0-alpha0/"));
+    let mut x = the_connection.await;
+
+    match x {
+        Ok(mut z) => {
+            let resp = z.call(Request::Peers).await;
+            match resp {
+                Ok(res) => {
+                println!("peers response: {}", res);
+            }
+                Err(error) => {
+                println!("peer error: {}", error);
+            }
+            }
+
+            let resp_2 = z.call(Request::Peers).await;
+
+            match resp_2 {
+                Ok(res) => {
+                println!("peers response: {}", res);
+            }
+                Err(error) => {
+                println!("peer error: {}", error);
+            }
+            }
+        }
+
+
+
+        Err(error) => println!("Connection failed: {:?}", error)
+    };
+    println!("seem to be done with the connection...");
+}
 
 #[tokio::main]
 async fn main()
 {
-    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
-    let the_connection = connect_isolated_tcp_direct(Network::Mainnet, peer_addr, String::from("/Seeder-and-feeder:0.0.0-alpha0/"));
-    let mut x = the_connection.await.unwrap();
-
-    let resp = x.call(Request::Peers).await;
-    println!("Peers response: {:?}", resp);
+//    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
+    //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
+    let peer_addr = "34.127.5.144:8233".to_socket_addrs().unwrap().next().unwrap();
+    loop {
+        //let peer_addr = SocketAddr::new(proband_ip, proband_port);
+        test_a_server(peer_addr).await;
+        sleep(Duration::new(5, 0));
+    }
+    
 }
