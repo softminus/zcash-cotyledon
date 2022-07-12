@@ -24,12 +24,12 @@ futures = "0.3.21"
 tokio = { version = "1.18.2", features = ["net", "time", "tracing", "macros", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.8", features = ["sync", "time"] }
 tokio-util = { version = "0.7.2", features = ["codec"] }
-tower = { version = "0.4.12", features = ["retry", "discover", "load", "load-shed", "timeout", "util", "buffer"] }
+tower = { version = "0.4.13", features = ["retry", "discover", "load", "load-shed", "timeout", "util", "buffer"] }
 
 
-hyper = { version = "0.14", features = ["full"] }
+#hyper = { version = "0.14", features = ["full"] }
 
 
-zebra-network = {git = "https://github.com/ZcashFoundation/zebra", rev = "e1a7a305d2ff17d5e7dd9a7374277fb763cc1514"}
-zebra-chain = {git = "https://github.com/ZcashFoundation/zebra", rev = "e1a7a305d2ff17d5e7dd9a7374277fb763cc1514"}
-zebra-state = {git = "https://github.com/ZcashFoundation/zebra", rev = "e1a7a305d2ff17d5e7dd9a7374277fb763cc1514"}
+zebra-network = {git = "https://github.com/ZcashFoundation/zebra"}
+zebra-chain = {git = "https://github.com/ZcashFoundation/zebra"}
+zebra-state = {git = "https://github.com/ZcashFoundation/zebra"}
