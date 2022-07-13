@@ -46,6 +46,16 @@ use zebra_network::PeerAddrState;
 use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
 
+
+use tonic::{transport::Server, Request as TonicRequest, Response as TonicResponse, Status};
+
+use seeder_proto::seeder_server::{Seeder, SeederServer};
+use seeder_proto::{SeedRequest, SeedReply};
+
+pub mod seeder_proto {
+    tonic::include_proto!("seeder"); // The string specified here must match the proto package name
+}
+
 #[derive(Debug)]
 enum PollResult {
     ConnectionFail,

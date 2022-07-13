@@ -33,3 +33,9 @@ tower = { version = "0.4.13", features = ["retry", "discover", "load", "load-she
 zebra-network = {git = "https://github.com/ZcashFoundation/zebra"}
 zebra-chain = {git = "https://github.com/ZcashFoundation/zebra"}
 zebra-state = {git = "https://github.com/ZcashFoundation/zebra"}
+
+tonic = "0.7"
+prost = "0.10"
+
+[build-dependencies]
+tonic-build = "0.7"
