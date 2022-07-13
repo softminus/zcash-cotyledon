@@ -129,11 +129,11 @@ async fn main()
     let addr = "127.0.0.1:50051".parse().unwrap();
     let seedfeed = SeedContext::default();
 
-    Server::builder()
+    let seeder_service = Server::builder()
         .add_service(SeederServer::new(seedfeed))
-        .serve(addr)
-        .await;
+        .serve(addr);
 
+    tokio::spawn(seeder_service);
 
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
