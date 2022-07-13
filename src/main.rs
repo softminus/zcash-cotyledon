@@ -56,6 +56,28 @@ pub mod seeder_proto {
     tonic::include_proto!("seeder"); // The string specified here must match the proto package name
 }
 
+#[derive(Debug, Default)]
+pub struct SeedContext {}
+
+#[tonic::async_trait]
+impl Seeder for SeedContext {
+    async fn seed(
+        &self,
+        request: TonicRequest<SeedRequest>, // Accept request of type SeedRequest
+    ) -> Result<TonicResponse<SeedReply>, Status> { // Return an instance of type SeedReply
+        println!("Got a request: {:?}", request);
+
+        let reply = seeder_proto::SeedReply {
+            ip: format!("127.0.0.1:8233")
+        };
+
+        Ok(TonicResponse::new(reply)) // Send back our formatted greeting
+    }
+}
+
+
+
+
 #[derive(Debug)]
 enum PollResult {
     ConnectionFail,
@@ -104,6 +126,15 @@ struct PeerStats {
 #[tokio::main]
 async fn main()
 {
+    let addr = "127.0.0.1:50051".parse().unwrap();
+    let seedfeed = SeedContext::default();
+
+    Server::builder()
+        .add_service(SeederServer::new(seedfeed))
+        .serve(addr)
+        .await;
+
+
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
     let peer_addrs = ["34.127.5.144:8233", "157.245.172.190:8233"];
@@ -134,5 +165,7 @@ async fn main()
     //     test_a_server(peer_addr).await;
     //     sleep(Duration::new(5, 0));
     // }
+
+
     
 }
