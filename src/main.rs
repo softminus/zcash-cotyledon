@@ -68,7 +68,7 @@ impl Seeder for SeedContext {
         println!("Got a request: {:?}", request);
 
         let reply = seeder_proto::SeedReply {
-            ip: format!("127.0.0.1:8233")
+            ip: ["34.127.5.144:8233".to_string(), "157.245.172.190:8233".to_string()].to_vec()
         };
 
         Ok(TonicResponse::new(reply)) // Send back our formatted greeting
