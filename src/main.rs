@@ -107,9 +107,15 @@ async fn main()
     }
     loop {
         for peer in peer_tracker.iter_mut() {
-            println!("result = {:?}", test_a_server(peer.address).await);
+            let poll_res = test_a_server(peer.address).await;
+            println!("result = {:?}", poll_res);
             peer.attempts += 1;
+            match poll_res {
+                PollResult::PollOK => {peer.successes += 1}
+                _ => {}
+            }
             sleep(Duration::new(4,0));
+            println!("updated peer stats = {:?}", peer);
         }
     }
     // .to_socket_addrs().unwrap().next().unwrap();
