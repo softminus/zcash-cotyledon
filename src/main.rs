@@ -46,9 +46,14 @@ use zebra_network::PeerAddrState;
 use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
 
+#[derive(Debug)]
+enum PollResult {
+    ConnectionFail,
+    RequestFail,
+    PollOK
+}
 
-
-async fn test_a_server(peer_addr: SocketAddr)
+async fn test_a_server(peer_addr: SocketAddr) -> PollResult
 {
     println!("peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(Network::Mainnet, peer_addr, String::from("/Seeder-and-feeder:0.0.0-alpha0/"));
@@ -60,32 +65,26 @@ async fn test_a_server(peer_addr: SocketAddr)
             match resp {
                 Ok(res) => {
                 println!("peers response: {}", res);
+                return PollResult::PollOK;
             }
                 Err(error) => {
                 println!("peer error: {}", error);
-            }
-            }
-
-            let resp_2 = z.call(Request::Peers).await;
-
-            match resp_2 {
-                Ok(res) => {
-                println!("peers response: {}", res);
-            }
-                Err(error) => {
-                println!("peer error: {}", error);
+                return PollResult::RequestFail;
             }
             }
         }
 
 
 
-        Err(error) => println!("Connection failed: {:?}", error)
+        Err(error) => {
+            println!("Connection failed: {:?}", error);
+            return PollResult::ConnectionFail;
+        }
     };
     println!("seem to be done with the connection...");
 }
 
-
+#[derive(Debug)]
 struct PeerStats {
     address: SocketAddr,
     attempts: i32,
@@ -108,7 +107,7 @@ async fn main()
     }
     loop {
         for peer in peer_tracker.iter_mut() {
-            test_a_server(peer.address).await;
+            println!("result = {:?}", test_a_server(peer.address).await);
             peer.attempts += 1;
             sleep(Duration::new(4,0));
         }
