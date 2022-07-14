@@ -6,7 +6,7 @@ use std::time::Duration;
 use zebra_chain::{chain_tip::NoChainTip, parameters::Network};
 use tokio::{pin, select, sync::oneshot};
 use tokio::runtime::Runtime;
-
+use std::sync::Mutex;
 use std::{
     collections::HashSet,
     future::Future,
@@ -138,16 +138,21 @@ async fn main()
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
     let peer_addrs = ["34.127.5.144:8233", "157.245.172.190:8233"];
-    let mut peer_tracker = Vec::new();
+    let peer_tracker = Arc::new(Mutex::new(Vec::new()));
+
+    let mut unlocked = peer_tracker.lock().unwrap();
     
     for peer in peer_addrs {
         let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
             attempts: 0,
             successes: 0};
-        peer_tracker.push(i);
+        unlocked.push(i);
     }
+    std::mem::drop(unlocked);
+
     loop {
-        for peer in peer_tracker.iter_mut() {
+        let mut unlocked = peer_tracker.lock().unwrap();
+        for peer in unlocked.iter_mut() {
             let poll_res = test_a_server(peer.address).await;
             println!("result = {:?}", poll_res);
             peer.attempts += 1;
@@ -155,9 +160,11 @@ async fn main()
                 PollResult::PollOK => {peer.successes += 1}
                 _ => {}
             }
-            sleep(Duration::new(4,0));
             println!("updated peer stats = {:?}", peer);
         }
+        std::mem::drop(unlocked);
+
+        sleep(Duration::new(4,0));
     }
     // .to_socket_addrs().unwrap().next().unwrap();
     // loop {
