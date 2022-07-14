@@ -56,8 +56,10 @@ pub mod seeder_proto {
     tonic::include_proto!("seeder"); // The string specified here must match the proto package name
 }
 
-#[derive(Debug, Default)]
-pub struct SeedContext {}
+#[derive(Debug)]
+pub struct SeedContext {
+    peer_tracker_shared: Arc<Mutex<Vec<PeerStats>>>
+}
 
 #[tonic::async_trait]
 impl Seeder for SeedContext {
@@ -66,9 +68,9 @@ impl Seeder for SeedContext {
         request: TonicRequest<SeedRequest>, // Accept request of type SeedRequest
     ) -> Result<TonicResponse<SeedReply>, Status> { // Return an instance of type SeedReply
         println!("Got a request: {:?}", request);
-
+        let peer_tracker_shared = self.peer_tracker_shared.lock().unwrap();
         let reply = seeder_proto::SeedReply {
-            ip: ["34.127.5.144:8233".to_string(), "157.245.172.190:8233".to_string()].to_vec()
+            ip: [format!("{:?}", peer_tracker_shared)].to_vec()
         };
 
         Ok(TonicResponse::new(reply)) // Send back our formatted greeting
@@ -116,7 +118,7 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
     println!("seem to be done with the connection...");
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct PeerStats {
     address: SocketAddr,
     attempts: i32,
@@ -127,7 +129,9 @@ struct PeerStats {
 async fn main()
 {
     let addr = "127.0.0.1:50051".parse().unwrap();
-    let seedfeed = SeedContext::default();
+    let peer_tracker_shared = Arc::new(Mutex::new(Vec::new()));
+
+    let seedfeed = SeedContext {peer_tracker_shared: peer_tracker_shared.clone()};
 
     let seeder_service = Server::builder()
         .add_service(SeederServer::new(seedfeed))
@@ -138,21 +142,19 @@ async fn main()
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
     let peer_addrs = ["34.127.5.144:8233", "157.245.172.190:8233"];
-    let peer_tracker = Arc::new(Mutex::new(Vec::new()));
+    let mut internal_peer_tracker = Vec::new();
 
-    let mut unlocked = peer_tracker.lock().unwrap();
+
     
     for peer in peer_addrs {
         let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
             attempts: 0,
             successes: 0};
-        unlocked.push(i);
+        internal_peer_tracker.push(i);
     }
-    std::mem::drop(unlocked);
 
     loop {
-        let mut unlocked = peer_tracker.lock().unwrap();
-        for peer in unlocked.iter_mut() {
+        for peer in internal_peer_tracker.iter_mut() {
             let poll_res = test_a_server(peer.address).await;
             println!("result = {:?}", poll_res);
             peer.attempts += 1;
@@ -162,6 +164,8 @@ async fn main()
             }
             println!("updated peer stats = {:?}", peer);
         }
+        let mut unlocked = peer_tracker_shared.lock().unwrap();
+        *unlocked = internal_peer_tracker.clone();
         std::mem::drop(unlocked);
 
         sleep(Duration::new(4,0));
