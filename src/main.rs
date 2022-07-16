@@ -69,8 +69,12 @@ impl Seeder for SeedContext {
     ) -> Result<TonicResponse<SeedReply>, Status> { // Return an instance of type SeedReply
         println!("Got a request: {:?}", request);
         let peer_tracker_shared = self.peer_tracker_shared.lock().unwrap();
+        let mut peer_strings = Vec::new();
+        for peer in peer_tracker_shared.iter() {
+            peer_strings.push(format!("{:?}",peer.address))
+        }
         let reply = seeder_proto::SeedReply {
-            ip: [format!("{:?}", peer_tracker_shared)].to_vec()
+            ip: peer_strings
         };
 
         Ok(TonicResponse::new(reply)) // Send back our formatted greeting
