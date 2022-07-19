@@ -122,7 +122,7 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
     println!("seem to be done with the connection...");
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 struct EWMAState {
     scale:       Duration,
     weight:      f64,
@@ -135,11 +135,28 @@ struct PeerStats {
     address: SocketAddr,
     attempts: i32,
     successes: i32,
-    uptimes: Vec<EWMAState>
+    uptimes: EWMAPack
 }
 
+#[derive(Debug, Clone, Copy)]
+struct EWMAPack{
+    stat2H: EWMAState,
+    stat8H: EWMAState,
+    stat1D: EWMAState,
+    stat1W: EWMAState,
+    stat1M: EWMAState
+}
 
-
+impl Default for EWMAPack {
+    fn default() -> Self { EWMAPack {
+        stat2H: EWMAState {scale: Duration::new(3600*2,0), ..Default::default()},
+        stat8H: EWMAState {scale: Duration::new(3600*8,0), ..Default::default()},
+        stat1D: EWMAState {scale: Duration::new(3600*24,0), ..Default::default()},
+        stat1W: EWMAState {scale: Duration::new(3600*24*7,0), ..Default::default()},
+        stat1M: EWMAState {scale: Duration::new(3600*24*30,0), ..Default::default()}
+    }
+    }
+}
 fn update_EWMA(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     let weight_factor = (-sample_age.as_secs_f64()/prev.scale.as_secs_f64()).exp();
 
@@ -156,6 +173,7 @@ fn update_EWMA(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     prev.count = count;
     prev.reliability = reliability;
 }
+
 
 #[tokio::main]
 async fn main()
