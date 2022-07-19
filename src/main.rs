@@ -199,7 +199,8 @@ async fn main()
     for peer in peer_addrs {
         let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
             attempts: 0,
-            successes: 0};
+            successes: 0,
+            uptimes: EWMAPack::default()};
         internal_peer_tracker.push(i);
     }
 
