@@ -123,10 +123,38 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
 }
 
 #[derive(Debug, Clone, Copy)]
+struct EWMAState {
+    scale:       Duration,
+    weight:      f64,
+    count:       f64,
+    reliability: f64,
+}
+
+#[derive(Debug, Clone)]
 struct PeerStats {
     address: SocketAddr,
     attempts: i32,
     successes: i32,
+    uptimes: Vec<EWMAState>
+}
+
+
+
+fn update_EWMA(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
+    let weight_factor = (-sample_age.as_secs_f64()/prev.scale.as_secs_f64()).exp();
+
+    let sample_value:f64 = sample as i32 as f64;
+
+    let reliability:f64 = prev.reliability * weight_factor + sample_value * (1.0-weight_factor);
+
+    // I don't understand what this and the following line do
+    let count:f64 = prev.count * weight_factor + 1.0;
+
+    let weight:f64 = prev.weight * weight_factor + (1.0-weight_factor);
+
+    prev.weight = weight;
+    prev.count = count;
+    prev.reliability = reliability;
 }
 
 #[tokio::main]
