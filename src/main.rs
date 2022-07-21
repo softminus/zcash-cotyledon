@@ -129,7 +129,7 @@ struct EWMAState {
     reliability: f64,
 }
 
-#[derive(Debug, Clone, Copyg)]
+#[derive(Debug, Clone, Copy)]
 struct PeerStats {
     address: SocketAddr,
     total_attempts: i32,
@@ -202,26 +202,26 @@ fn IsGood(peer: PeerStats) -> bool {
     return false;
 }
 
-fn GetBanTime(peer: PeerStats) -> i32 {
-    if IsGood(peer) {return 0}
+fn GetBanTime(peer: PeerStats) -> Option<Duration> {
+    if IsGood(peer) {return None}
     // if (clientVersion && clientVersion < 31900) { return 604800; }
     let EWMAs = peer.uptimes;
 
-    if (EWMAs.stat1M.reliability - EWMAs.stat1M.weight + 1.0 < 0.15 && EWMAs.stat1M.count > 32.0) { return 30*86400; }
-    if (EWMAs.stat1W.reliability - EWMAs.stat1W.weight + 1.0 < 0.10 && EWMAs.stat1W.count > 16.0) { return 7*86400;  }
-    if (EWMAs.stat1D.reliability - EWMAs.stat1D.weight + 1.0 < 0.05 && EWMAs.stat1D.count > 8.0)  { return 1*86400;  }
-    return 0;
+    if (EWMAs.stat1M.reliability - EWMAs.stat1M.weight + 1.0 < 0.15 && EWMAs.stat1M.count > 32.0) { return Some(Duration::from_secs(30*86400)); }
+    if (EWMAs.stat1W.reliability - EWMAs.stat1W.weight + 1.0 < 0.10 && EWMAs.stat1W.count > 16.0) { return Some(Duration::from_secs(7*86400));  }
+    if (EWMAs.stat1D.reliability - EWMAs.stat1D.weight + 1.0 < 0.05 && EWMAs.stat1D.count > 8.0)  { return Some(Duration::from_secs(1*86400));  }
+    return None;
 }
 
-fn GetIgnoreTime(peer: PeerStats) ->i32 {
-    if IsGood(peer) {return 0}
+fn GetIgnoreTime(peer: PeerStats) -> Option<Duration> {
+    if IsGood(peer) {return None}
     let EWMAs = peer.uptimes;
 
-    if (EWMAs.stat1M.reliability - EWMAs.stat1M.weight + 1.0 < 0.20 && EWMAs.stat1M.count > 2.0)  { return 10*86400; }
-    if (EWMAs.stat1W.reliability - EWMAs.stat1W.weight + 1.0 < 0.16 && EWMAs.stat1W.count > 2.0)  { return 3*86400;  }
-    if (EWMAs.stat1D.reliability - EWMAs.stat1D.weight + 1.0 < 0.12 && EWMAs.stat1D.count > 2.0)  { return 8*3600;   }
-    if (EWMAs.stat8H.reliability - EWMAs.stat8H.weight + 1.0 < 0.08 && EWMAs.stat8H.count > 2.0)  { return 2*3600;   }
-    return 0;
+    if (EWMAs.stat1M.reliability - EWMAs.stat1M.weight + 1.0 < 0.20 && EWMAs.stat1M.count > 2.0)  { return Some(Duration::from_secs(10*86400)); }
+    if (EWMAs.stat1W.reliability - EWMAs.stat1W.weight + 1.0 < 0.16 && EWMAs.stat1W.count > 2.0)  { return Some(Duration::from_secs(3*86400));  }
+    if (EWMAs.stat1D.reliability - EWMAs.stat1D.weight + 1.0 < 0.12 && EWMAs.stat1D.count > 2.0)  { return Some(Duration::from_secs(8*3600));   }
+    if (EWMAs.stat8H.reliability - EWMAs.stat8H.weight + 1.0 < 0.08 && EWMAs.stat8H.count > 2.0)  { return Some(Duration::from_secs(2*3600));   }
+    return None;
 }
 
 
