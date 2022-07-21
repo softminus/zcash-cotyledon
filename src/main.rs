@@ -129,7 +129,7 @@ struct EWMAState {
     reliability: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copyg)]
 struct PeerStats {
     address: SocketAddr,
     total_attempts: i32,
@@ -180,6 +180,52 @@ fn update_EWMA_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
     update_EWMA(&mut prev.stat1W, sample_age, sample);
     update_EWMA(&mut prev.stat1M, sample_age, sample);
 }
+
+
+fn IsGood(peer: PeerStats) -> bool {
+/*
+    if (ip.GetPort() != GetDefaultPort()) return false;
+    if (!(services & NODE_NETWORK)) return false;
+    if (!ip.IsRoutable()) return false;
+    if (clientVersion && clientVersion < REQUIRE_VERSION) return false;
+    if (blocks && blocks < GetRequireHeight()) return false;
+*/
+    let EWMAs = peer.uptimes;
+    if (peer.total_attempts <= 3 && peer.total_successes * 2 >= peer.total_attempts) {return true};
+
+    if (EWMAs.stat2H.reliability > 0.85 && EWMAs.stat2H.count > 2.0 ) {return true};
+    if (EWMAs.stat8H.reliability > 0.70 && EWMAs.stat8H.count > 4.0 ) {return true};
+    if (EWMAs.stat1D.reliability > 0.55 && EWMAs.stat1D.count > 8.0 ) {return true};
+    if (EWMAs.stat1W.reliability > 0.45 && EWMAs.stat1W.count > 16.0) {return true};
+    if (EWMAs.stat1M.reliability > 0.35 && EWMAs.stat1M.count > 32.0) {return true};
+
+    return false;
+}
+
+fn GetBanTime(peer: PeerStats) -> i32 {
+    if IsGood(peer) {return 0}
+    // if (clientVersion && clientVersion < 31900) { return 604800; }
+    let EWMAs = peer.uptimes;
+
+    if (EWMAs.stat1M.reliability - EWMAs.stat1M.weight + 1.0 < 0.15 && EWMAs.stat1M.count > 32.0) { return 30*86400; }
+    if (EWMAs.stat1W.reliability - EWMAs.stat1W.weight + 1.0 < 0.10 && EWMAs.stat1W.count > 16.0) { return 7*86400;  }
+    if (EWMAs.stat1D.reliability - EWMAs.stat1D.weight + 1.0 < 0.05 && EWMAs.stat1D.count > 8.0)  { return 1*86400;  }
+    return 0;
+}
+
+fn GetIgnoreTime(peer: PeerStats) ->i32 {
+    if IsGood(peer) {return 0}
+    let EWMAs = peer.uptimes;
+
+    if (EWMAs.stat1M.reliability - EWMAs.stat1M.weight + 1.0 < 0.20 && EWMAs.stat1M.count > 2.0)  { return 10*86400; }
+    if (EWMAs.stat1W.reliability - EWMAs.stat1W.weight + 1.0 < 0.16 && EWMAs.stat1W.count > 2.0)  { return 3*86400;  }
+    if (EWMAs.stat1D.reliability - EWMAs.stat1D.weight + 1.0 < 0.12 && EWMAs.stat1D.count > 2.0)  { return 8*3600;   }
+    if (EWMAs.stat8H.reliability - EWMAs.stat8H.weight + 1.0 < 0.08 && EWMAs.stat8H.count > 2.0)  { return 2*3600;   }
+    return 0;
+}
+
+
+
 #[tokio::main]
 async fn main()
 {
