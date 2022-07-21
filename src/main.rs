@@ -105,31 +105,31 @@ struct PeerStats {
     address: SocketAddr,
     total_attempts: i32,
     total_successes: i32,
-    uptimes: EWMAPack,
+    ewma_pack: EWMAPack,
     last_polled: Instant,
     last_polled_absolute: SystemTime
 }
 
 #[derive(Debug, Clone, Copy)]
 struct EWMAPack{
-    stat2H: EWMAState,
-    stat8H: EWMAState,
-    stat1D: EWMAState,
-    stat1W: EWMAState,
-    stat1M: EWMAState
+    stat_2_hours: EWMAState,
+    stat_8_hours: EWMAState,
+    stat_1day: EWMAState,
+    stat_1week: EWMAState,
+    stat_1month: EWMAState
 }
 
 impl Default for EWMAPack {
     fn default() -> Self { EWMAPack {
-        stat2H: EWMAState {scale: Duration::new(3600*2,0), ..Default::default()},
-        stat8H: EWMAState {scale: Duration::new(3600*8,0), ..Default::default()},
-        stat1D: EWMAState {scale: Duration::new(3600*24,0), ..Default::default()},
-        stat1W: EWMAState {scale: Duration::new(3600*24*7,0), ..Default::default()},
-        stat1M: EWMAState {scale: Duration::new(3600*24*30,0), ..Default::default()}
+        stat_2_hours: EWMAState {scale: Duration::new(3600*2,0), ..Default::default()},
+        stat_8_hours: EWMAState {scale: Duration::new(3600*8,0), ..Default::default()},
+        stat_1day: EWMAState {scale: Duration::new(3600*24,0), ..Default::default()},
+        stat_1week: EWMAState {scale: Duration::new(3600*24*7,0), ..Default::default()},
+        stat_1month: EWMAState {scale: Duration::new(3600*24*30,0), ..Default::default()}
     }
     }
 }
-fn update_EWMA(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
+fn update_ewma(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     let weight_factor = (-sample_age.as_secs_f64()/prev.scale.as_secs_f64()).exp();
 
     let sample_value:f64 = sample as i32 as f64;
@@ -142,18 +142,18 @@ fn update_EWMA(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     prev.weight = prev.weight * weight_factor + (1.0-weight_factor);
 }
 
-fn update_EWMA_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
+fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
     let current = Instant::now();
     let sample_age = current.duration_since(last_polled);
-    update_EWMA(&mut prev.stat2H, sample_age, sample);
-    update_EWMA(&mut prev.stat8H, sample_age, sample);
-    update_EWMA(&mut prev.stat1D, sample_age, sample);
-    update_EWMA(&mut prev.stat1W, sample_age, sample);
-    update_EWMA(&mut prev.stat1M, sample_age, sample);
+    update_ewma(&mut prev.stat_2_hours, sample_age, sample);
+    update_ewma(&mut prev.stat_8_hours, sample_age, sample);
+    update_ewma(&mut prev.stat_1day, sample_age, sample);
+    update_ewma(&mut prev.stat_1week, sample_age, sample);
+    update_ewma(&mut prev.stat_1month, sample_age, sample);
 }
 
 
-fn IsGood(peer: PeerStats) -> bool {
+fn is_good(peer: PeerStats) -> bool {
 /*
     if (ip.GetPort() != GetDefaultPort()) return false;
     if (!(services & NODE_NETWORK)) return false;
@@ -161,37 +161,37 @@ fn IsGood(peer: PeerStats) -> bool {
     if (clientVersion && clientVersion < REQUIRE_VERSION) return false;
     if (blocks && blocks < GetRequireHeight()) return false;
 */
-    let EWMAs = peer.uptimes;
+    let ewmas = peer.ewma_pack;
     if peer.total_attempts <= 3 && peer.total_successes * 2 >= peer.total_attempts {return true};
 
-    if EWMAs.stat2H.reliability > 0.85 && EWMAs.stat2H.count > 2.0  {return true};
-    if EWMAs.stat8H.reliability > 0.70 && EWMAs.stat8H.count > 4.0  {return true};
-    if EWMAs.stat1D.reliability > 0.55 && EWMAs.stat1D.count > 8.0  {return true};
-    if EWMAs.stat1W.reliability > 0.45 && EWMAs.stat1W.count > 16.0 {return true};
-    if EWMAs.stat1M.reliability > 0.35 && EWMAs.stat1M.count > 32.0 {return true};
+    if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0  {return true};
+    if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0  {return true};
+    if ewmas.stat_1day.reliability > 0.55 && ewmas.stat_1day.count > 8.0  {return true};
+    if ewmas.stat_1week.reliability > 0.45 && ewmas.stat_1week.count > 16.0 {return true};
+    if ewmas.stat_1month.reliability > 0.35 && ewmas.stat_1month.count > 32.0 {return true};
 
     return false;
 }
 
-fn GetBanTime(peer: PeerStats) -> Option<Duration> {
-    if IsGood(peer) {return None}
+fn get_ban_time(peer: PeerStats) -> Option<Duration> {
+    if is_good(peer) {return None}
     // if (clientVersion && clientVersion < 31900) { return 604800; }
-    let EWMAs = peer.uptimes;
+    let ewmas = peer.ewma_pack;
 
-    if EWMAs.stat1M.reliability - EWMAs.stat1M.weight + 1.0 < 0.15 && EWMAs.stat1M.count > 32.0 { return Some(Duration::from_secs(30*86400)); }
-    if EWMAs.stat1W.reliability - EWMAs.stat1W.weight + 1.0 < 0.10 && EWMAs.stat1W.count > 16.0 { return Some(Duration::from_secs(7*86400));  }
-    if EWMAs.stat1D.reliability - EWMAs.stat1D.weight + 1.0 < 0.05 && EWMAs.stat1D.count > 8.0  { return Some(Duration::from_secs(1*86400));  }
+    if ewmas.stat_1month.reliability - ewmas.stat_1month.weight + 1.0 < 0.15 && ewmas.stat_1month.count > 32.0 { return Some(Duration::from_secs(30*86400)); }
+    if ewmas.stat_1week.reliability - ewmas.stat_1week.weight + 1.0 < 0.10 && ewmas.stat_1week.count > 16.0 { return Some(Duration::from_secs(7*86400));  }
+    if ewmas.stat_1day.reliability - ewmas.stat_1day.weight + 1.0 < 0.05 && ewmas.stat_1day.count > 8.0  { return Some(Duration::from_secs(1*86400));  }
     return None;
 }
 
-fn GetIgnoreTime(peer: PeerStats) -> Option<Duration> {
-    if IsGood(peer) {return None}
-    let EWMAs = peer.uptimes;
+fn get_ignore_time(peer: PeerStats) -> Option<Duration> {
+    if is_good(peer) {return None}
+    let ewmas = peer.ewma_pack;
 
-    if EWMAs.stat1M.reliability - EWMAs.stat1M.weight + 1.0 < 0.20 && EWMAs.stat1M.count > 2.0  { return Some(Duration::from_secs(10*86400)); }
-    if EWMAs.stat1W.reliability - EWMAs.stat1W.weight + 1.0 < 0.16 && EWMAs.stat1W.count > 2.0  { return Some(Duration::from_secs(3*86400));  }
-    if EWMAs.stat1D.reliability - EWMAs.stat1D.weight + 1.0 < 0.12 && EWMAs.stat1D.count > 2.0  { return Some(Duration::from_secs(8*3600));   }
-    if EWMAs.stat8H.reliability - EWMAs.stat8H.weight + 1.0 < 0.08 && EWMAs.stat8H.count > 2.0  { return Some(Duration::from_secs(2*3600));   }
+    if ewmas.stat_1month.reliability - ewmas.stat_1month.weight + 1.0 < 0.20 && ewmas.stat_1month.count > 2.0  { return Some(Duration::from_secs(10*86400)); }
+    if ewmas.stat_1week.reliability - ewmas.stat_1week.weight + 1.0 < 0.16 && ewmas.stat_1week.count > 2.0  { return Some(Duration::from_secs(3*86400));  }
+    if ewmas.stat_1day.reliability - ewmas.stat_1day.weight + 1.0 < 0.12 && ewmas.stat_1day.count > 2.0  { return Some(Duration::from_secs(8*3600));   }
+    if ewmas.stat_8_hours.reliability - ewmas.stat_8_hours.weight + 1.0 < 0.08 && ewmas.stat_8_hours.count > 2.0  { return Some(Duration::from_secs(2*3600));   }
     return None;
 }
 
@@ -222,7 +222,7 @@ async fn main()
         let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
             total_attempts: 0,
             total_successes: 0,
-            uptimes: EWMAPack::default(),
+            ewma_pack: EWMAPack::default(),
             last_polled: Instant::now(),
             last_polled_absolute: SystemTime::now()};
         internal_peer_tracker.push(i);
@@ -237,10 +237,10 @@ async fn main()
             match poll_res {
                 PollResult::PollOK => {
                     peer.total_successes += 1;
-                    update_EWMA_pack(&mut peer.uptimes, peer.last_polled, true);
+                    update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, true);
                 }
                 _ => {
-                    update_EWMA_pack(&mut peer.uptimes, peer.last_polled, false);
+                    update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, false);
                 }
             }
             peer.last_polled_absolute = SystemTime::now();
