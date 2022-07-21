@@ -2,7 +2,7 @@
 
 use zebra_network::init;
 
-use std::time::Duration;
+use std::time::{Duration, Instant, SystemTime};
 use zebra_chain::{chain_tip::NoChainTip, parameters::Network};
 use tokio::{pin, select, sync::oneshot};
 use tokio::runtime::Runtime;
@@ -41,7 +41,6 @@ use zebra_network::{
 
 use zebra_network::types::PeerServices;
 use zebra_chain::serialization::DateTime32;
-use std::time::Instant;
 use zebra_network::PeerAddrState;
 use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
@@ -133,9 +132,11 @@ struct EWMAState {
 #[derive(Debug, Clone)]
 struct PeerStats {
     address: SocketAddr,
-    attempts: i32,
-    successes: i32,
-    uptimes: EWMAPack
+    total_attempts: i32,
+    total_successes: i32,
+    uptimes: EWMAPack,
+    last_polled: Instant,
+    last_polled_absolute: SystemTime
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -161,20 +162,24 @@ fn update_EWMA(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     let weight_factor = (-sample_age.as_secs_f64()/prev.scale.as_secs_f64()).exp();
 
     let sample_value:f64 = sample as i32 as f64;
-
-    let reliability:f64 = prev.reliability * weight_factor + sample_value * (1.0-weight_factor);
+    println!("sample_value is: {}, weight_factor is {}", sample_value, weight_factor);
+    prev.reliability = prev.reliability * weight_factor + sample_value * (1.0-weight_factor);
 
     // I don't understand what this and the following line do
-    let count:f64 = prev.count * weight_factor + 1.0;
+    prev.count = prev.count * weight_factor + 1.0;
 
-    let weight:f64 = prev.weight * weight_factor + (1.0-weight_factor);
-
-    prev.weight = weight;
-    prev.count = count;
-    prev.reliability = reliability;
+    prev.weight = prev.weight * weight_factor + (1.0-weight_factor);
 }
 
-
+fn update_EWMA_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
+    let current = Instant::now();
+    let sample_age = current.duration_since(last_polled);
+    update_EWMA(&mut prev.stat2H, sample_age, sample);
+    update_EWMA(&mut prev.stat8H, sample_age, sample);
+    update_EWMA(&mut prev.stat1D, sample_age, sample);
+    update_EWMA(&mut prev.stat1W, sample_age, sample);
+    update_EWMA(&mut prev.stat1M, sample_age, sample);
+}
 #[tokio::main]
 async fn main()
 {
@@ -198,20 +203,28 @@ async fn main()
     
     for peer in peer_addrs {
         let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
-            attempts: 0,
-            successes: 0,
-            uptimes: EWMAPack::default()};
+            total_attempts: 0,
+            total_successes: 0,
+            uptimes: EWMAPack::default(),
+            last_polled: Instant::now(),
+            last_polled_absolute: SystemTime::now()};
         internal_peer_tracker.push(i);
     }
 
     loop {
         for peer in internal_peer_tracker.iter_mut() {
+            let poll_time = Instant::now();
             let poll_res = test_a_server(peer.address).await;
             println!("result = {:?}", poll_res);
-            peer.attempts += 1;
+            peer.total_attempts += 1;
             match poll_res {
-                PollResult::PollOK => {peer.successes += 1}
-                _ => {}
+                PollResult::PollOK => {
+                    peer.total_successes += 1;
+                    update_EWMA_pack(&mut peer.uptimes, peer.last_polled, true);
+                }
+                _ => {
+                    update_EWMA_pack(&mut peer.uptimes, peer.last_polled, false);
+                }
             }
             println!("updated peer stats = {:?}", peer);
         }
