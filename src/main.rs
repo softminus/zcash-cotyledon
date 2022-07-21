@@ -1,47 +1,19 @@
 #![feature(type_name_of_val)]
 
-use zebra_network::init;
 
 use std::time::{Duration, Instant, SystemTime};
-use zebra_chain::{chain_tip::NoChainTip, parameters::Network};
-use tokio::{pin, select, sync::oneshot};
-use tokio::runtime::Runtime;
+use zebra_chain::{parameters::Network};
 use std::sync::Mutex;
 use std::{
-    collections::HashSet,
-    future::Future,
-    pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
 };
 
-use futures::{
-    future::{FutureExt, TryFutureExt},
-    stream::Stream,
-};
-use chrono::Utc;
-use tokio::sync::oneshot::error::TryRecvError;
-
-use std::net::{IpAddr, Ipv4Addr};
 
 
-use tower::{builder::ServiceBuilder, buffer::Buffer, timeout::Timeout, util::BoxService, Service, ServiceExt, service_fn};
+use tower::Service;
 
-use zebra_network as zn;
-use zebra_state as zs;
-use zn::Response;
-use zebra_chain::{
-    block::{self, Block},
-    transaction::UnminedTxId,
-};
-use zebra_network::{
-    constants::{ADDR_RESPONSE_LIMIT_DENOMINATOR, MAX_ADDRS_IN_MESSAGE},
-    AddressBook, InventoryResponse, Config, connect_isolated_tcp_direct, Request
-};
+use zebra_network::{connect_isolated_tcp_direct, Request};
 
-use zebra_network::types::PeerServices;
-use zebra_chain::serialization::DateTime32;
-use zebra_network::PeerAddrState;
 use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
 
