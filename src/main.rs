@@ -64,7 +64,7 @@ enum PollResult {
 
 async fn test_a_server(peer_addr: SocketAddr) -> PollResult
 {
-    println!("peer addr is {:?}", peer_addr);
+    println!("Starting new connection: peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(Network::Mainnet, peer_addr, String::from("/Seeder-and-feeder:0.0.0-alpha0/"));
     let x = the_connection.await;
 
@@ -90,7 +90,6 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
             return PollResult::ConnectionFail;
         }
     };
-    println!("seem to be done with the connection...");
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -244,6 +243,9 @@ async fn main()
                     update_EWMA_pack(&mut peer.uptimes, peer.last_polled, false);
                 }
             }
+            peer.last_polled_absolute = SystemTime::now();
+
+            peer.last_polled = poll_time;
             println!("updated peer stats = {:?}", peer);
         }
         let mut unlocked = peer_tracker_shared.lock().unwrap();
