@@ -100,6 +100,13 @@ struct EWMAState {
     reliability: f64,
 }
 
+enum PeerClassification {
+    Banned,             // Not even worth trying to query (for a long time)
+    Good,               // Node is good, and is worth serving to clients
+    Bad,                // Node is temporarily bad
+    Unknown,            // We got told about this node but haven't yet queried it
+    CurrentlyQuerying,  // Currently in the process of querying this node
+}
 #[derive(Debug, Clone, Copy)]
 struct PeerStats {
     address: SocketAddr,
@@ -217,7 +224,7 @@ async fn main()
     let mut internal_peer_tracker = Vec::new();
 
 
-    
+
     for peer in peer_addrs {
         let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
             total_attempts: 0,
