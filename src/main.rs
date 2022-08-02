@@ -9,7 +9,6 @@ use std::{
 };
 
 
-
 use tower::Service;
 
 use zebra_network::{connect_isolated_tcp_direct, Request};
@@ -100,16 +99,18 @@ struct EWMAState {
     reliability: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum PeerClassification {
     Banned,             // Not even worth trying to query (for a long time)
     Good,               // Node is good, and is worth serving to clients
     Bad,                // Node is temporarily bad
     Unknown,            // We got told about this node but haven't yet queried it
-    CurrentlyQuerying,  // Currently in the process of querying this node
+    ActiveQuery,        // Currently in the process of querying this node
 }
 #[derive(Debug, Clone, Copy)]
 struct PeerStats {
     address: SocketAddr,
+    peer_classification: PeerClassification,
     total_attempts: i32,
     total_successes: i32,
     ewma_pack: EWMAPack,
@@ -125,6 +126,7 @@ struct EWMAPack{
     stat_1week: EWMAState,
     stat_1month: EWMAState
 }
+
 
 impl Default for EWMAPack {
     fn default() -> Self { EWMAPack {
@@ -227,12 +229,16 @@ async fn main()
 
     for peer in peer_addrs {
         let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
+            peer_classification: PeerClassification::Unknown,
             total_attempts: 0,
             total_successes: 0,
             ewma_pack: EWMAPack::default(),
             last_polled: Instant::now(),
             last_polled_absolute: SystemTime::now()};
         internal_peer_tracker.push(i);
+    }
+    for k in internal_peer_tracker.iter_mut().filter(|x| x.peer_classification == PeerClassification::Unknown) {
+        k.peer_classification = PeerClassification::ActiveQuery;
     }
 
     loop {
