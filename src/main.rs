@@ -8,14 +8,15 @@ use std::{
     sync::Arc,
 };
 
+use std::collections::HashSet;
 
 use tower::Service;
-
+use zebra_chain::block::Hash;
 use zebra_network::{connect_isolated_tcp_direct, Request};
 
 use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
-
+use hex::FromHex;
 
 use tonic::{transport::Server, Request as TonicRequest, Response as TonicResponse, Status};
 
@@ -66,10 +67,14 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
     println!("Starting new connection: peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(Network::Mainnet, peer_addr, String::from("/Seeder-and-feeder:0.0.0-alpha0/"));
     let x = the_connection.await;
-
+    let mut proband_hash_set = HashSet::new();
+    let proband_hash = <Hash>::from_hex("000000000145f21eabd0024fbbb00384111644a5415b02bfe169b4fc300290e6").expect("hex string failure");
+    proband_hash_set.insert(proband_hash);
     match x {
         Ok(mut z) => {
-            let resp = z.call(Request::Peers).await;
+            println!("connection status: {:?}", z);
+
+            let resp = z.call(Request::BlocksByHash(proband_hash_set)).await;
             match resp {
                 Ok(res) => {
                 println!("peers response: {}", res);
@@ -222,7 +227,7 @@ async fn main()
 
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
-    let peer_addrs = ["34.127.5.144:8233", "157.245.172.190:8233"];
+    let peer_addrs = ["157.245.172.190:8233", "34.127.5.144:8233"];
     let mut internal_peer_tracker = Vec::new();
 
 
