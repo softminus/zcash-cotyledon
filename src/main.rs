@@ -169,7 +169,6 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
 
 fn is_good(peer: PeerStats) -> bool {
 /*
-    if (ip.GetPort() != GetDefaultPort()) return false;
     if (!(services & NODE_NETWORK)) return false;
     if (!ip.IsRoutable()) return false;
     if (clientVersion && clientVersion < REQUIRE_VERSION) return false;
@@ -187,6 +186,9 @@ fn is_good(peer: PeerStats) -> bool {
     return false;
 }
 
+fn is_good_for_dns(peer: PeerStats, network: Network) -> bool {
+    return is_good(peer) && (peer.address.port() == network.default_port())
+}
 fn get_ban_time(peer: PeerStats) -> Option<Duration> {
     if is_good(peer) {return None}
     // if (clientVersion && clientVersion < 31900) { return 604800; }
