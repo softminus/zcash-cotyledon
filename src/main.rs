@@ -1,5 +1,5 @@
 #![feature(type_name_of_val)]
-
+#![feature(ip)]
 
 use std::time::{Duration, Instant, SystemTime};
 use zebra_chain::{parameters::Network};
@@ -170,10 +170,12 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
 fn is_good(peer: PeerStats) -> bool {
 /*
     if (!(services & NODE_NETWORK)) return false;
-    if (!ip.IsRoutable()) return false;
     if (clientVersion && clientVersion < REQUIRE_VERSION) return false;
     if (blocks && blocks < GetRequireHeight()) return false;
 */
+    if !peer.address.ip().is_global() {
+        return false;
+    }
     let ewmas = peer.ewma_pack;
     if peer.total_attempts <= 3 && peer.total_successes * 2 >= peer.total_attempts {return true};
 
