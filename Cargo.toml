@@ -16,7 +16,7 @@ lazy_static = "1.4.0"
 ordered-map = "0.4.2"
 pin-project = "1.0.10"
 rand = { version = "0.8.5", package = "rand" }
-regex = "1.5.6"
+
 serde = { version = "1.0.137", features = ["serde_derive"] }
 thiserror = "1.0.31"
 
@@ -30,9 +30,9 @@ tower = { version = "0.4.13", features = ["retry", "discover", "load", "load-she
 #hyper = { version = "0.14", features = ["full"] }
 
 
-zebra-network = {git = "https://github.com/ZcashFoundation/zebra"}
-zebra-chain = {git = "https://github.com/ZcashFoundation/zebra"}
-zebra-state = {git = "https://github.com/ZcashFoundation/zebra"}
+zebra-network = {path = "/Users/sasha_work/repos/zebra/zebra-network"}
+zebra-chain = {path = "/Users/sasha_work/repos/zebra/zebra-chain"}
+zebra-state = {path= "/Users/sasha_work/repos/zebra/zebra-state"}
 
 tonic = "0.7"
 prost = "0.10"
