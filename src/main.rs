@@ -13,10 +13,11 @@ use std::collections::HashSet;
 use tower::Service;
 use zebra_chain::block::Hash;
 use zebra_network::{connect_isolated_tcp_direct, Request};
-
+use zebra_chain::block::Height;
 use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
 use hex::FromHex;
+//use zebra_network::protocol::external::types::Version;
 
 use tonic::{transport::Server, Request as TonicRequest, Response as TonicResponse, Status};
 
@@ -62,6 +63,7 @@ enum PollResult {
     PollOK
 }
 
+
 async fn test_a_server(peer_addr: SocketAddr) -> PollResult
 {
     println!("Starting new connection: peer addr is {:?}", peer_addr);
@@ -72,7 +74,7 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
     proband_hash_set.insert(proband_hash);
     match x {
         Ok(mut z) => {
-            println!("connection status: {:?}", z);
+            println!("connection info: {:?}", z.connection_info);
 
             let resp = z.call(Request::BlocksByHash(proband_hash_set)).await;
             match resp {
@@ -120,7 +122,8 @@ struct PeerStats {
     total_successes: i32,
     ewma_pack: EWMAPack,
     last_polled: Instant,
-    last_polled_absolute: SystemTime
+    last_polled_absolute: SystemTime,
+    last_start_height: Height
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -169,6 +172,7 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
 
 fn is_good(peer: PeerStats) -> bool {
 /*
+
     if (!(services & NODE_NETWORK)) return false;
     if (clientVersion && clientVersion < REQUIRE_VERSION) return false;
     if (blocks && blocks < GetRequireHeight()) return false;
@@ -188,6 +192,22 @@ fn is_good(peer: PeerStats) -> bool {
     return false;
 }
 
+fn required_height(network: Network) -> Height {
+    match network {
+        Network::Mainnet => {Height(1759558)}
+        Network::Testnet => {Height(1982923)}
+    }
+}
+
+fn required_serving_version(network: Network) -> u32 { //convert this to `Version` once https://github.com/ZcashFoundation/zebra/pull/4870#issuecomment-1203333547 is addressed
+    match network {
+        Network::Mainnet => {170_100}
+        Network::Testnet => {170_040}
+    }
+}
+fn check_last_height(peer: PeerStats, network: Network) -> bool {
+    return peer.last_start_height > required_height(network);
+}
 fn is_good_for_dns(peer: PeerStats, network: Network) -> bool {
     return is_good(peer) && (peer.address.port() == network.default_port())
 }
@@ -218,6 +238,8 @@ fn get_ignore_time(peer: PeerStats) -> Option<Duration> {
 #[tokio::main]
 async fn main()
 {
+//    let network = Network::Mainnet;
+//    println!("{:?}", required_height(network));
     let addr = "127.0.0.1:50051".parse().unwrap();
     let peer_tracker_shared = Arc::new(Mutex::new(Vec::new()));
 
@@ -243,7 +265,8 @@ async fn main()
             total_successes: 0,
             ewma_pack: EWMAPack::default(),
             last_polled: Instant::now(),
-            last_polled_absolute: SystemTime::now()};
+            last_polled_absolute: SystemTime::now(),
+            last_start_height: Height(0)};
         internal_peer_tracker.push(i);
     }
     for k in internal_peer_tracker.iter_mut().filter(|x| x.peer_classification == PeerClassification::Unknown) {
