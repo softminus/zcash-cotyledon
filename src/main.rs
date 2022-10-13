@@ -13,6 +13,10 @@ use std::collections::HashSet;
 use tower::Service;
 use zebra_chain::block::Hash;
 use zebra_network::{connect_isolated_tcp_direct, Request};
+use zebra_network::{
+    types::{AddrInVersion, Nonce, PeerServices},
+    ConnectedAddr, ConnectionInfo, Version, VersionMessage,
+};
 use zebra_chain::block::Height;
 use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
@@ -74,7 +78,9 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
     proband_hash_set.insert(proband_hash);
     match x {
         Ok(mut z) => {
-            println!("connection info: {:?}", z.connection_info);
+            println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
+            println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
+            println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
 
             let resp = z.call(Request::BlocksByHash(proband_hash_set)).await;
             match resp {
