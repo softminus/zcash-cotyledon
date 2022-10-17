@@ -96,21 +96,35 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
             println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
             println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
 
-            let resp = z.call(Request::BlocksByHash(proband_hash_set)).await;
+            let resp = z.call(Request::Peers).await;
             match resp {
                 Ok(res) => {
+                    match res {
+                        zebra_network::Response::Peers(ref xx) => println!("peers is: {:?}", xx),
+                        _ => ()
+                    }
                 println!("peers response: {}", res);
-                return PollStatus::PollOK(peer_derived_data);
             }
                 Err(error) => {
                 println!("peer error: {}", error);
+            }
+            }
+            let resp = z.call(Request::BlocksByHash(proband_hash_set)).await;
+            match resp {
+                Ok(res) => {
+                println!("blocks by hash response: {}", res);
+                return PollStatus::PollOK(peer_derived_data);
+            }
+                Err(error) => {
+                println!("blocks by hash error: {}", error);
                 return PollStatus::BlockRequestFail(peer_derived_data);
             }
             }
-        }
+         
+        
 
 
-
+        } // ok connect
         Err(error) => {
             println!("Connection failed: {:?}", error);
             return PollStatus::ConnectionFail();
