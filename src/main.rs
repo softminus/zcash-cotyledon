@@ -306,13 +306,19 @@ async fn main()
             println!("result = {:?}", poll_res);
             peer.total_attempts += 1;
             match poll_res {
-                PollStatus::PollOK(_) => {
+                PollStatus::PollOK(new_peer_data) => {
                     peer.total_successes += 1;
+                    peer.peer_derived_data = Some(new_peer_data);
                     update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, true);
                 }
-                _ => {
+                PollStatus::BlockRequestFail(new_peer_data) => {
+                    peer.peer_derived_data = Some(new_peer_data);
                     update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, false);
                 }
+                PollStatus::ConnectionFail() => {
+                    update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, false);
+                }
+
             }
             peer.last_polled_absolute = SystemTime::now();
 
