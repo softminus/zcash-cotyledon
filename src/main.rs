@@ -134,7 +134,7 @@ enum PeerClassification {
     Unknown,            // We got told about this node but haven't yet queried it
     ActiveQuery,        // Currently in the process of querying this node
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct PeerStats {
     address: SocketAddr,
     peer_classification: PeerClassification,
@@ -191,7 +191,7 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
 }
 
 
-fn is_good(peer: PeerStats) -> bool {
+fn is_good(peer: &PeerStats) -> bool {
 /*
 
     if (!(services & NODE_NETWORK)) return false;
@@ -230,10 +230,10 @@ fn check_last_height(peer: PeerStats, network: Network) -> bool {
     return peer.last_start_height > required_height(network);
 }
 fn is_good_for_dns(peer: PeerStats, network: Network) -> bool {
-    return is_good(peer) && (peer.address.port() == network.default_port())
+    return is_good(&peer) && (peer.address.port() == network.default_port())
 }
 fn get_ban_time(peer: PeerStats) -> Option<Duration> {
-    if is_good(peer) {return None}
+    if is_good(&peer) {return None}
     // if (clientVersion && clientVersion < 31900) { return 604800; }
     let ewmas = peer.ewma_pack;
 
@@ -244,7 +244,7 @@ fn get_ban_time(peer: PeerStats) -> Option<Duration> {
 }
 
 fn get_ignore_time(peer: PeerStats) -> Option<Duration> {
-    if is_good(peer) {return None}
+    if is_good(&peer) {return None}
     let ewmas = peer.ewma_pack;
 
     if ewmas.stat_1month.reliability - ewmas.stat_1month.weight + 1.0 < 0.20 && ewmas.stat_1month.count > 2.0  { return Some(Duration::from_secs(10*86400)); }
