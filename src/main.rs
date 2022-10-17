@@ -60,14 +60,14 @@ impl Seeder for SeedContext {
 
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum PollStatus {
-    ConnectionFail(Box<dyn std::error::Error>),
-    BlockRequestFail(ConnectionData),
-    PollOK(ConnectionData)
+    ConnectionFail(),
+    BlockRequestFail(PeerDerivedData),
+    PollOK(PeerDerivedData)
 }
-#[derive(Debug)]
-struct ConnectionData {
+#[derive(Debug, Clone)]
+struct PeerDerivedData {
     numeric_version: Version,
     peer_services:   PeerServices,
     peer_height:     Height,
@@ -91,7 +91,7 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
             let peer_height = z.connection_info.remote.start_height;
             let user_agent = z.connection_info.remote.user_agent.clone();
             let relay = z.connection_info.remote.relay;
-            let connection_data = ConnectionData {numeric_version, peer_services, peer_height, user_agent, relay};
+            let peer_derived_data = PeerDerivedData {numeric_version, peer_services, peer_height, user_agent, relay};
             println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
             println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
             println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
@@ -100,11 +100,11 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
             match resp {
                 Ok(res) => {
                 println!("peers response: {}", res);
-                return PollStatus::PollOK(connection_data);
+                return PollStatus::PollOK(peer_derived_data);
             }
                 Err(error) => {
                 println!("peer error: {}", error);
-                return PollStatus::BlockRequestFail(connection_data);
+                return PollStatus::BlockRequestFail(peer_derived_data);
             }
             }
         }
@@ -143,7 +143,8 @@ struct PeerStats {
     ewma_pack: EWMAPack,
     last_polled: Instant,
     last_polled_absolute: SystemTime,
-    last_start_height: Height
+
+    peer_derived_data: Option<PeerDerivedData>
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -286,7 +287,8 @@ async fn main()
             ewma_pack: EWMAPack::default(),
             last_polled: Instant::now(),
             last_polled_absolute: SystemTime::now(),
-            last_start_height: Height(0)};
+            peer_derived_data: None
+        };
         internal_peer_tracker.push(i);
     }
     for k in internal_peer_tracker.iter_mut().filter(|x| x.peer_classification == PeerClassification::Unknown) {
