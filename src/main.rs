@@ -92,9 +92,9 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
             let user_agent = z.connection_info.remote.user_agent.clone();
             let relay = z.connection_info.remote.relay;
             let peer_derived_data = PeerDerivedData {numeric_version, peer_services, peer_height, user_agent, relay};
-            println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
-            println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
-            println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
+            // println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
+            // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
+            // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
 
             let resp = z.call(Request::Peers).await;
             match resp {
@@ -185,7 +185,7 @@ fn update_ewma(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     let weight_factor = (-sample_age.as_secs_f64()/prev.scale.as_secs_f64()).exp();
 
     let sample_value:f64 = sample as i32 as f64;
-    println!("sample_value is: {}, weight_factor is {}", sample_value, weight_factor);
+    //println!("sample_value is: {}, weight_factor is {}", sample_value, weight_factor);
     prev.reliability = prev.reliability * weight_factor + sample_value * (1.0-weight_factor);
 
     // I don't understand what this and the following line do
@@ -330,7 +330,8 @@ async fn main()
         for peer in internal_peer_tracker.iter_mut() {
             let poll_time = Instant::now();
             let poll_res = test_a_server(peer.address).await;
-            println!("result = {:?}", poll_res);
+            println!("\n\n\n");
+            //println!("result = {:?}", poll_res);
             peer.total_attempts += 1;
             match poll_res {
                 PollStatus::PollOK(new_peer_data) => {
@@ -350,7 +351,7 @@ async fn main()
             peer.last_polled_absolute = SystemTime::now();
 
             peer.last_polled = poll_time;
-            println!("updated peer stats = {:?}", peer);
+           // println!("updated peer stats = {:?}", peer);
         }
         let mut unlocked = peer_tracker_shared.lock().unwrap();
         *unlocked = internal_peer_tracker.clone();
