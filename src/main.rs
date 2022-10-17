@@ -113,7 +113,7 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
 
         Err(error) => {
             println!("Connection failed: {:?}", error);
-            return PollStatus::ConnectionFail(error);
+            return PollStatus::ConnectionFail();
         }
     };
 }
