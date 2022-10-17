@@ -99,11 +99,11 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
             let resp = z.call(Request::Peers).await;
             match resp {
                 Ok(res) => {
+                    println!("peers response: {}", res);
                     match res {
                         zebra_network::Response::Peers(ref xx) => println!("peers is: {:?}", xx),
                         _ => ()
                     }
-                println!("peers response: {}", res);
             }
                 Err(error) => {
                 println!("peer error: {}", error);
