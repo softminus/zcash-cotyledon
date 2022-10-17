@@ -227,7 +227,11 @@ fn required_serving_version(network: Network) -> u32 { //convert this to `Versio
     }
 }
 fn check_last_height(peer: PeerStats, network: Network) -> bool {
-    return peer.last_start_height > required_height(network);
+    match peer.peer_derived_data {
+        Some(valid_data) => return valid_data.peer_height > required_height(network),
+        None => return false
+    }
+    
 }
 fn is_good_for_dns(peer: PeerStats, network: Network) -> bool {
     return is_good(&peer) && (peer.address.port() == network.default_port())
