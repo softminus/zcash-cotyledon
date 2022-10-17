@@ -192,12 +192,25 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
 
 
 fn is_good(peer: &PeerStats) -> bool {
-/*
 
-    if (!(services & NODE_NETWORK)) return false;
-    if (clientVersion && clientVersion < REQUIRE_VERSION) return false;
-    if (blocks && blocks < GetRequireHeight()) return false;
-*/
+    if peer.peer_derived_data.is_none() {
+        return false;
+    }
+
+    let peer_derived_data = peer.peer_derived_data.as_ref().unwrap();
+
+    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) {
+        return false;
+    }
+
+    if peer_derived_data.numeric_version < Version(170_100) {
+        return false;
+    }
+
+    if peer_derived_data.peer_height < Height(1_700_000) {
+        return false;
+    }
+
     if !peer.address.ip().is_global() {
         return false;
     }
