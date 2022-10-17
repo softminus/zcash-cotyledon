@@ -61,14 +61,22 @@ impl Seeder for SeedContext {
 
 
 #[derive(Debug)]
-enum PollResult {
-    ConnectionFail,
-    RequestFail,
-    PollOK
+enum PollStatus {
+    ConnectionFail(Box<dyn std::error::Error>),
+    BlockRequestFail(ConnectionData),
+    PollOK(ConnectionData)
+}
+#[derive(Debug)]
+struct ConnectionData {
+    numeric_version: Version,
+    peer_services:   PeerServices,
+    peer_height:     Height,
+    user_agent:      String,
+    relay:           bool,
 }
 
 
-async fn test_a_server(peer_addr: SocketAddr) -> PollResult
+async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
 {
     println!("Starting new connection: peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(Network::Mainnet, peer_addr, String::from("/Seeder-and-feeder:0.0.0-alpha0/"));
@@ -78,6 +86,12 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
     proband_hash_set.insert(proband_hash);
     match x {
         Ok(mut z) => {
+            let numeric_version = z.connection_info.remote.version;
+            let peer_services = z.connection_info.remote.services;
+            let peer_height = z.connection_info.remote.start_height;
+            let user_agent = z.connection_info.remote.user_agent.clone();
+            let relay = z.connection_info.remote.relay;
+            let connection_data = ConnectionData {numeric_version, peer_services, peer_height, user_agent, relay};
             println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
             println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
             println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
@@ -86,11 +100,11 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
             match resp {
                 Ok(res) => {
                 println!("peers response: {}", res);
-                return PollResult::PollOK;
+                return PollStatus::PollOK(connection_data);
             }
                 Err(error) => {
                 println!("peer error: {}", error);
-                return PollResult::RequestFail;
+                return PollStatus::BlockRequestFail(connection_data);
             }
             }
         }
@@ -99,7 +113,7 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollResult
 
         Err(error) => {
             println!("Connection failed: {:?}", error);
-            return PollResult::ConnectionFail;
+            return PollStatus::ConnectionFail(error);
         }
     };
 }
@@ -286,7 +300,7 @@ async fn main()
             println!("result = {:?}", poll_res);
             peer.total_attempts += 1;
             match poll_res {
-                PollResult::PollOK => {
+                PollStatus::PollOK(_) => {
                     peer.total_successes += 1;
                     update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, true);
                 }
