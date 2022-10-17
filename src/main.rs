@@ -220,10 +220,10 @@ fn required_height(network: Network) -> Height {
     }
 }
 
-fn required_serving_version(network: Network) -> u32 { //convert this to `Version` once https://github.com/ZcashFoundation/zebra/pull/4870#issuecomment-1203333547 is addressed
+fn required_serving_version(network: Network) -> Version { //convert this to `Version` once https://github.com/ZcashFoundation/zebra/pull/4870#issuecomment-1203333547 is addressed
     match network {
-        Network::Mainnet => {170_100}
-        Network::Testnet => {170_040}
+        Network::Mainnet => {Version(170_100)}
+        Network::Testnet => {Version(170_040)}
     }
 }
 fn check_last_height(peer: PeerStats, network: Network) -> bool {
