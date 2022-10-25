@@ -27,7 +27,7 @@ use tonic::{transport::Server, Request as TonicRequest, Response as TonicRespons
 
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedRequest, SeedReply};
-
+use zebra_network::types::MetaAddr;
 pub mod seeder_proto {
     tonic::include_proto!("seeder"); // The string specified here must match the proto package name
 }
@@ -64,7 +64,7 @@ impl Seeder for SeedContext {
 enum PollStatus {
     ConnectionFail(),
     BlockRequestFail(PeerDerivedData),
-    PollOK(PeerDerivedData)
+    BlockRequestOK(PeerDerivedData)
 }
 #[derive(Debug, Clone)]
 struct PeerDerivedData {
@@ -74,7 +74,6 @@ struct PeerDerivedData {
     user_agent:      String,
     relay:           bool,
 }
-
 
 async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
 {
@@ -96,41 +95,67 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
             // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
             // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
 
-            let resp = z.call(Request::Peers).await;
-            match resp {
-                Ok(res) => {
-                    println!("peers response: {}", res);
-                    match res {
-                        zebra_network::Response::Peers(ref xx) => println!("peers is: {:?}", xx),
-                        _ => ()
-                    }
-            }
-                Err(error) => {
-                println!("peer error: {}", error);
-            }
-            }
             let resp = z.call(Request::BlocksByHash(proband_hash_set)).await;
             match resp {
                 Ok(res) => {
-                println!("blocks by hash response: {}", res);
-                return PollStatus::PollOK(peer_derived_data);
+                println!("blocks by hash good: {}", res);
+                return PollStatus::BlockRequestOK(peer_derived_data)
             }
                 Err(error) => {
                 println!("blocks by hash error: {}", error);
-                return PollStatus::BlockRequestFail(peer_derived_data);
+                return PollStatus::BlockRequestFail(peer_derived_data)
             }
             }
-         
-        
-
-
         } // ok connect
         Err(error) => {
             println!("Connection failed: {:?}", error);
             return PollStatus::ConnectionFail();
+        } // failed connect
+    };
+}
+
+
+
+async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>>
+{
+    println!("Starting new connection: peer addr is {:?}", peer_addr);
+    let the_connection = connect_isolated_tcp_direct(Network::Mainnet, peer_addr, String::from("/Seeder-and-feeder:0.0.0-alpha0/"));
+    let x = the_connection.await;
+    match x {
+        Ok(mut z) => {
+            let numeric_version = z.connection_info.remote.version;
+            let peer_services = z.connection_info.remote.services;
+            let peer_height = z.connection_info.remote.start_height;
+            let user_agent = z.connection_info.remote.user_agent.clone();
+            let relay = z.connection_info.remote.relay;
+            let peer_derived_data = PeerDerivedData {numeric_version, peer_services, peer_height, user_agent, relay};
+            // println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
+            // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
+            // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
+
+            let mut peers_vec: Vec<MetaAddr> = Vec::new();
+            for attempt in 0..2 {
+                let resp = z.call(Request::Peers).await;
+                if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = resp {
+                    if (candidate_peers.len() > 1) {
+                        peers_vec = candidate_peers.to_vec();
+                        break;
+                    }
+                }
+            }
+            println!("peers is: {:?}", peers_vec);
+
+            return Some(peers_vec);
+        } // ok connect
+        Err(error) => {
+            println!("Connection failed: {:?}", error);
+            return None;
         }
     };
 }
+
+
+
 
 #[derive(Debug, Clone, Copy, Default)]
 struct EWMAState {
@@ -305,7 +330,7 @@ async fn main()
 
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
-    let peer_addrs = ["157.245.172.190:8233", "34.127.5.144:8233"];
+    let peer_addrs = ["35.230.70.77:8233"];
     let mut internal_peer_tracker = Vec::new();
 
 
@@ -334,7 +359,7 @@ async fn main()
             //println!("result = {:?}", poll_res);
             peer.total_attempts += 1;
             match poll_res {
-                PollStatus::PollOK(new_peer_data) => {
+                PollStatus::BlockRequestOK(new_peer_data) => {
                     peer.total_successes += 1;
                     peer.peer_derived_data = Some(new_peer_data);
                     update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, true);
