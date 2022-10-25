@@ -123,32 +123,20 @@ async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>>
     let x = the_connection.await;
     match x {
         Ok(mut z) => {
-            let numeric_version = z.connection_info.remote.version;
-            let peer_services = z.connection_info.remote.services;
-            let peer_height = z.connection_info.remote.start_height;
-            let user_agent = z.connection_info.remote.user_agent.clone();
-            let relay = z.connection_info.remote.relay;
-            let peer_derived_data = PeerDerivedData {numeric_version, peer_services, peer_height, user_agent, relay};
-            // println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
-            // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
-            // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
-
-            let mut peers_vec: Vec<MetaAddr> = Vec::new();
-            for attempt in 0..2 {
+            let mut peers_vec: Option<Vec<MetaAddr>> = None;
+            for _attempt in 0..2 {
                 let resp = z.call(Request::Peers).await;
                 if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = resp {
-                    if (candidate_peers.len() > 1) {
-                        peers_vec = candidate_peers.to_vec();
+                    if candidate_peers.len() > 1 {
+                        peers_vec = Some(candidate_peers.to_vec());
                         break;
                     }
                 }
             }
-            println!("peers is: {:?}", peers_vec);
-
-            return Some(peers_vec);
+            return peers_vec;
         } // ok connect
         Err(error) => {
-            println!("Connection failed: {:?}", error);
+            println!("Peers connection failed: {:?}", error);
             return None;
         }
     };
@@ -272,7 +260,7 @@ fn required_height(network: Network) -> Height {
     }
 }
 
-fn required_serving_version(network: Network) -> Version { //convert this to `Version` once https://github.com/ZcashFoundation/zebra/pull/4870#issuecomment-1203333547 is addressed
+fn required_serving_version(network: Network) -> Version {
     match network {
         Network::Mainnet => {Version(170_100)}
         Network::Testnet => {Version(170_040)}
@@ -352,9 +340,17 @@ async fn main()
     }
 
     loop {
+        let mut new_peers = Vec::new();
         for peer in internal_peer_tracker.iter_mut() {
             let poll_time = Instant::now();
             let poll_res = test_a_server(peer.address).await;
+            let peers_res = probe_for_peers(peer.address).await;
+            if let Some(peer_list) = peers_res {
+                for peer in peer_list {
+                    new_peers.push(peer.addr());
+                }
+                println!("{:?}", new_peers);
+            }
             println!("\n\n\n");
             //println!("result = {:?}", poll_res);
             peer.total_attempts += 1;
@@ -378,9 +374,24 @@ async fn main()
             peer.last_polled = poll_time;
            // println!("updated peer stats = {:?}", peer);
         }
+
+        for peer in &new_peers {
+            let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
+                peer_classification: PeerClassification::Unknown,
+                total_attempts: 0,
+                total_successes: 0,
+                ewma_pack: EWMAPack::default(),
+                last_polled: Instant::now(),
+                last_polled_absolute: SystemTime::now(),
+                peer_derived_data: None
+            };
+            internal_peer_tracker.push(i);
+        }
+        new_peers.clear();
         let mut unlocked = peer_tracker_shared.lock().unwrap();
         *unlocked = internal_peer_tracker.clone();
         std::mem::drop(unlocked);
+        println!("{:?}", internal_peer_tracker);
 
         sleep(Duration::new(4,0));
     }
