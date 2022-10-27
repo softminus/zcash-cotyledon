@@ -37,25 +37,25 @@ pub struct SeedContext {
     peer_tracker_shared: Arc<Mutex<Vec<PeerStats>>>
 }
 
-#[tonic::async_trait]
-impl Seeder for SeedContext {
-    async fn seed(
-        &self,
-        request: TonicRequest<SeedRequest>, // Accept request of type SeedRequest
-    ) -> Result<TonicResponse<SeedReply>, Status> { // Return an instance of type SeedReply
-        println!("Got a request: {:?}", request);
-        let peer_tracker_shared = self.peer_tracker_shared.lock().unwrap();
-        let mut peer_strings = Vec::new();
-        for peer in peer_tracker_shared.iter() {
-            peer_strings.push(format!("{:?}",peer.address))
-        }
-        let reply = seeder_proto::SeedReply {
-            ip: peer_strings
-        };
+// #[tonic::async_trait]
+// impl Seeder for SeedContext {
+//     async fn seed(
+//         &self,
+//         request: TonicRequest<SeedRequest>, // Accept request of type SeedRequest
+//     ) -> Result<TonicResponse<SeedReply>, Status> { // Return an instance of type SeedReply
+//         println!("Got a request: {:?}", request);
+//         let peer_tracker_shared = self.peer_tracker_shared.lock().unwrap();
+//         let mut peer_strings = Vec::new();
+// //        for peer in peer_tracker_shared.iter() {
+// //            peer_strings.push(format!("{:?}",peer.address))
+// //        }
+//         let reply = seeder_proto::SeedReply {
+//             ip: peer_strings
+//         };
 
-        Ok(TonicResponse::new(reply)) // Send back our formatted greeting
-    }
-}
+//         Ok(TonicResponse::new(reply)) // Send back our formatted greeting
+//     }
+// }
 
 
 
