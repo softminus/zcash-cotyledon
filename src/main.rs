@@ -163,7 +163,6 @@ enum PeerClassification {
 }
 #[derive(Debug, Clone)]
 struct PeerStats {
-    address: SocketAddr,
     peer_classification: PeerClassification,
     total_attempts: i32,
     total_successes: i32,
@@ -174,6 +173,11 @@ struct PeerStats {
     peer_derived_data: Option<PeerDerivedData>
 }
 
+#[derive(Debug, Clone)]
+struct ExtendedPeerStats {
+    address: SocketAddr,
+    stats:   PeerStats
+}
 #[derive(Debug, Clone, Copy)]
 struct EWMAPack{
     stat_2_hours: EWMAState,
