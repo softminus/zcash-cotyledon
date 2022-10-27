@@ -7,9 +7,9 @@ use std::sync::Mutex;
 use std::{
     sync::Arc,
 };
-
+use futures_util::FutureExt;
 use std::collections::{HashSet, HashMap};
-
+use futures::future::join_all;
 use tower::Service;
 use zebra_chain::block::Hash;
 use zebra_network::{connect_isolated_tcp_direct, Request};
@@ -129,7 +129,7 @@ async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>>
                 if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = resp {
                     if candidate_peers.len() > 1 {
                         peers_vec = Some(candidate_peers.to_vec());
-                        println!("{:?}", peers_vec);
+                        //println!("{:?}", peers_vec);
                         break;
                     }
                 }
@@ -348,36 +348,47 @@ async fn main()
     // }
 
     loop {
-        let mut found_peer_addresses = Vec::new();
-        for (proband_address, peer_stat) in internal_peer_tracker.iter_mut() {
-            let mut probe_results = probe_and_update(proband_address, peer_stat).await;
-            *peer_stat = probe_results.0.clone();
-            found_peer_addresses.append(&mut probe_results.1);
-            println!("PROBE_RESULTS {:?}", probe_results);
+        let mut handles = Vec::new();
+        for (proband_address, peer_stat) in internal_peer_tracker.iter() {
+            let handle = tokio::spawn(probe_and_update(proband_address.clone(), peer_stat.clone()));
+            handles.push(handle);
+            sleep(Duration::new(1,0));
         }
 
-        for peer in &found_peer_addresses {
-            let key = peer.to_socket_addrs().unwrap().next().unwrap();
-            if !internal_peer_tracker.contains_key(&key) {
-                let value = PeerStats {
-                    peer_classification: PeerClassification::Unknown,
-                    total_attempts: 0,
-                    total_successes: 0,
-                    ewma_pack: EWMAPack::default(),
-                    last_polled: Instant::now(),
-                    last_polled_absolute: SystemTime::now(),
-                    peer_derived_data: None
-                };
-                internal_peer_tracker.insert(key, value);
-            }    
+        let resultands = join_all(handles).await;
+        for probe in resultands {
+            if let Ok(probe_results) = probe {
+                println!("RESULT {:?}",probe_results);
+                let new_peer_stat = probe_results.0.clone();
+                let peer_address  = probe_results.1;
+                let new_peers = probe_results.2;
+                internal_peer_tracker.insert(peer_address, new_peer_stat);
+                for peer in new_peers {
+                    let key = peer.to_socket_addrs().unwrap().next().unwrap();
+                    if !internal_peer_tracker.contains_key(&key) {
+                        let value = PeerStats {
+                            peer_classification: PeerClassification::Unknown,
+                            total_attempts: 0,
+                            total_successes: 0,
+                            ewma_pack: EWMAPack::default(),
+                            last_polled: Instant::now(),
+                            last_polled_absolute: SystemTime::now(),
+                            peer_derived_data: None
+                        };
+                        internal_peer_tracker.insert(key, value);
+                    }    
+                }
+            }
         }
-        found_peer_addresses.clear();
+      
+
+
+        //println!("{:?}", internal_peer_tracker);
+
         // let mut unlocked = peer_tracker_shared.lock().unwrap();
         // *unlocked = internal_peer_tracker.clone();
         // std::mem::drop(unlocked);
-        println!("{:?}", internal_peer_tracker);
 
-        sleep(Duration::new(4,0));
     }
     // .to_socket_addrs().unwrap().next().unwrap();
     // loop {
@@ -393,19 +404,18 @@ async fn main()
 
 
 
-async fn probe_and_update(proband_address: &SocketAddr, old_stats: &PeerStats) -> (PeerStats, Vec<SocketAddr>) {
+async fn probe_and_update(proband_address: SocketAddr, old_stats: PeerStats) -> (PeerStats, SocketAddr, Vec<SocketAddr>) {
     let mut new_peer_stats = old_stats.clone();
     let mut found_peer_addresses = Vec::new();
     let poll_time = Instant::now();
-    let poll_res = test_a_server(*proband_address).await;
-    let peers_res = probe_for_peers(*proband_address).await;
+    let poll_res = test_a_server(proband_address).await;
+    let peers_res = probe_for_peers(proband_address).await;
     if let Some(peer_list) = peers_res {
         for peer in peer_list {
             found_peer_addresses.push(peer.addr());
         }
-        println!("found new peers: {:?}", found_peer_addresses);
+        //println!("found new peers: {:?}", found_peer_addresses);
     }
-    println!("\n\n\n");
     //println!("result = {:?}", poll_res);
     new_peer_stats.total_attempts += 1;
     match poll_res {
@@ -425,6 +435,6 @@ async fn probe_and_update(proband_address: &SocketAddr, old_stats: &PeerStats) -
     }
     new_peer_stats.last_polled_absolute = SystemTime::now();
     new_peer_stats.last_polled = poll_time;
-    return (new_peer_stats, found_peer_addresses);
+    return (new_peer_stats, proband_address, found_peer_addresses);
 
 }
