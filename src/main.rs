@@ -311,16 +311,16 @@ async fn main()
 {
 //    let network = Network::Mainnet;
 //    println!("{:?}", required_height(network));
-    let addr = "127.0.0.1:50051".parse().unwrap();
-    let peer_tracker_shared = Arc::new(Mutex::new(Vec::new()));
+    //let addr = "127.0.0.1:50051".parse().unwrap();
+    //let peer_tracker_shared = Arc::new(Mutex::new(Vec::new()));
 
-    let seedfeed = SeedContext {peer_tracker_shared: peer_tracker_shared.clone()};
+    // let seedfeed = SeedContext {peer_tracker_shared: peer_tracker_shared.clone()};
 
-    let seeder_service = Server::builder()
-        .add_service(SeederServer::new(seedfeed))
-        .serve(addr);
+    // let seeder_service = Server::builder()
+    //     .add_service(SeederServer::new(seedfeed))
+    //     .serve(addr);
 
-    tokio::spawn(seeder_service);
+    // tokio::spawn(seeder_service);
 
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
