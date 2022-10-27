@@ -156,9 +156,9 @@ struct EWMAState {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PeerClassification {
     Banned,             // Not even worth trying to query (for a long time)
-    Good,               // Node is good, and is worth serving to clients
-    Bad,                // Node is temporarily bad
-    Unknown,            // We got told about this node but haven't yet queried it
+    Good,               // KEEP Node is good, and is worth serving to clients
+    Bad,                // KEEP Node is temporarily bad
+    Unknown,            // KEEP We got told about this node but haven't yet queried it
     ActiveQuery,        // Currently in the process of querying this node
 }
 #[derive(Debug, Clone)]
