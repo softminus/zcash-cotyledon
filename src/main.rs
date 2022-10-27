@@ -324,13 +324,14 @@ async fn main()
 
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
-    let peer_addrs = ["35.230.70.77:8233"];
-    let mut internal_peer_tracker = Vec::new();
+    let initial_peer_addrs = ["35.230.70.77:8233"];
+    let mut internal_peer_tracker = HashMap::new();
 
 
 
-    for peer in peer_addrs {
-        let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
+    for peer in initial_peer_addrs {
+        let key = peer.to_socket_addrs().unwrap().next().unwrap();
+        let value = PeerStats {
             peer_classification: PeerClassification::Unknown,
             total_attempts: 0,
             total_successes: 0,
@@ -339,50 +340,51 @@ async fn main()
             last_polled_absolute: SystemTime::now(),
             peer_derived_data: None
         };
-        internal_peer_tracker.push(i);
+        internal_peer_tracker.insert(key, value);
     }
-    for k in internal_peer_tracker.iter_mut().filter(|x| x.peer_classification == PeerClassification::Unknown) {
-        k.peer_classification = PeerClassification::ActiveQuery;
-    }
+    // for k in internal_peer_tracker.iter_mut().filter(|x| x.peer_classification == PeerClassification::Unknown) {
+    //     k.peer_classification = PeerClassification::ActiveQuery;
+    // }
 
     loop {
-        let mut new_peers = Vec::new();
-        for peer in internal_peer_tracker.iter_mut() {
+        let mut found_peer_addresses = Vec::new();
+        for (proband_address, peer_stat) in internal_peer_tracker.iter_mut() {
             let poll_time = Instant::now();
-            let poll_res = test_a_server(peer.address).await;
-            let peers_res = probe_for_peers(peer.address).await;
+            let poll_res = test_a_server(*proband_address).await;
+            let peers_res = probe_for_peers(*proband_address).await;
             if let Some(peer_list) = peers_res {
                 for peer in peer_list {
-                    new_peers.push(peer.addr());
+                    found_peer_addresses.push(peer.addr());
                 }
-                println!("{:?}", new_peers);
+                println!("found new peers: {:?}", found_peer_addresses);
             }
             println!("\n\n\n");
             //println!("result = {:?}", poll_res);
-            peer.total_attempts += 1;
+            peer_stat.total_attempts += 1;
             match poll_res {
                 PollStatus::BlockRequestOK(new_peer_data) => {
-                    peer.total_successes += 1;
-                    peer.peer_derived_data = Some(new_peer_data);
-                    update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, true);
+                    peer_stat.total_successes += 1;
+                    peer_stat.peer_derived_data = Some(new_peer_data);
+                    update_ewma_pack(&mut peer_stat.ewma_pack, peer_stat.last_polled, true);
                 }
                 PollStatus::BlockRequestFail(new_peer_data) => {
-                    peer.peer_derived_data = Some(new_peer_data);
-                    update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, false);
+                    peer_stat.peer_derived_data = Some(new_peer_data);
+                    update_ewma_pack(&mut peer_stat.ewma_pack, peer_stat.last_polled, false);
                 }
                 PollStatus::ConnectionFail() => {
-                    update_ewma_pack(&mut peer.ewma_pack, peer.last_polled, false);
+                    update_ewma_pack(&mut peer_stat.ewma_pack, peer_stat.last_polled, false);
                 }
 
             }
-            peer.last_polled_absolute = SystemTime::now();
+            peer_stat.last_polled_absolute = SystemTime::now();
 
-            peer.last_polled = poll_time;
+            peer_stat.last_polled = poll_time;
            // println!("updated peer stats = {:?}", peer);
         }
 
-        for peer in &new_peers {
-            let i = PeerStats {address: peer.to_socket_addrs().unwrap().next().unwrap(),
+        for peer in &found_peer_addresses {
+            let key = peer.to_socket_addrs().unwrap().next().unwrap();
+            let value = PeerStats {
                 peer_classification: PeerClassification::Unknown,
                 total_attempts: 0,
                 total_successes: 0,
@@ -391,12 +393,12 @@ async fn main()
                 last_polled_absolute: SystemTime::now(),
                 peer_derived_data: None
             };
-            internal_peer_tracker.push(i);
+            internal_peer_tracker.insert(key, value);
         }
-        new_peers.clear();
-        let mut unlocked = peer_tracker_shared.lock().unwrap();
-        *unlocked = internal_peer_tracker.clone();
-        std::mem::drop(unlocked);
+        found_peer_addresses.clear();
+        // let mut unlocked = peer_tracker_shared.lock().unwrap();
+        // *unlocked = internal_peer_tracker.clone();
+        // std::mem::drop(unlocked);
         println!("{:?}", internal_peer_tracker);
 
         sleep(Duration::new(4,0));
