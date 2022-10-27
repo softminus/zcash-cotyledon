@@ -384,16 +384,18 @@ async fn main()
 
         for peer in &found_peer_addresses {
             let key = peer.to_socket_addrs().unwrap().next().unwrap();
-            let value = PeerStats {
-                peer_classification: PeerClassification::Unknown,
-                total_attempts: 0,
-                total_successes: 0,
-                ewma_pack: EWMAPack::default(),
-                last_polled: Instant::now(),
-                last_polled_absolute: SystemTime::now(),
-                peer_derived_data: None
-            };
-            internal_peer_tracker.insert(key, value);
+            if !internal_peer_tracker.contains_key(&key) {
+                let value = PeerStats {
+                    peer_classification: PeerClassification::Unknown,
+                    total_attempts: 0,
+                    total_successes: 0,
+                    ewma_pack: EWMAPack::default(),
+                    last_polled: Instant::now(),
+                    last_polled_absolute: SystemTime::now(),
+                    peer_derived_data: None
+                };
+                internal_peer_tracker.insert(key, value);
+            }    
         }
         found_peer_addresses.clear();
         // let mut unlocked = peer_tracker_shared.lock().unwrap();
