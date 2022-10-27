@@ -8,7 +8,7 @@ use std::{
     sync::Arc,
 };
 
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 use tower::Service;
 use zebra_chain::block::Hash;
