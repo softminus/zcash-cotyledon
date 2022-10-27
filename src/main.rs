@@ -222,13 +222,15 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
 }
 
 
-fn is_good(peer: &PeerStats) -> bool {
+fn is_good(peer: &ExtendedPeerStats) -> bool {
+    let peer_stats = &peer.stats;
+    let peer_address = &peer.address;
 
-    if peer.peer_derived_data.is_none() {
+    if peer_stats.peer_derived_data.is_none() {
         return false;
     }
 
-    let peer_derived_data = peer.peer_derived_data.as_ref().unwrap();
+    let peer_derived_data = peer_stats.peer_derived_data.as_ref().unwrap();
 
     if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) {
         return false;
@@ -242,11 +244,11 @@ fn is_good(peer: &PeerStats) -> bool {
         return false;
     }
 
-    if !peer.address.ip().is_global() {
+    if !peer_address.ip().is_global() {
         return false;
     }
-    let ewmas = peer.ewma_pack;
-    if peer.total_attempts <= 3 && peer.total_successes * 2 >= peer.total_attempts {return true};
+    let ewmas = peer_stats.ewma_pack;
+    if peer_stats.total_attempts <= 3 && peer_stats.total_successes * 2 >= peer_stats.total_attempts {return true};
 
     if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0     {return true};
     if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0     {return true};
@@ -277,13 +279,13 @@ fn check_last_height(peer: PeerStats, network: Network) -> bool {
     }
     
 }
-fn is_good_for_dns(peer: PeerStats, network: Network) -> bool {
+fn is_good_for_dns(peer: ExtendedPeerStats, network: Network) -> bool {
     return is_good(&peer) && (peer.address.port() == network.default_port())
 }
-fn get_ban_time(peer: PeerStats) -> Option<Duration> {
+fn get_ban_time(peer: ExtendedPeerStats) -> Option<Duration> {
     if is_good(&peer) {return None}
     // if (clientVersion && clientVersion < 31900) { return 604800; }
-    let ewmas = peer.ewma_pack;
+    let ewmas = peer.stats.ewma_pack;
 
     if ewmas.stat_1month.reliability - ewmas.stat_1month.weight + 1.0 < 0.15 && ewmas.stat_1month.count > 32.0 { return Some(Duration::from_secs(30*86400)); }
     if ewmas.stat_1week.reliability - ewmas.stat_1week.weight + 1.0 < 0.10 && ewmas.stat_1week.count > 16.0 { return Some(Duration::from_secs(7*86400));  }
@@ -291,9 +293,9 @@ fn get_ban_time(peer: PeerStats) -> Option<Duration> {
     return None;
 }
 
-fn get_ignore_time(peer: PeerStats) -> Option<Duration> {
+fn get_ignore_time(peer: ExtendedPeerStats) -> Option<Duration> {
     if is_good(&peer) {return None}
-    let ewmas = peer.ewma_pack;
+    let ewmas = peer.stats.ewma_pack;
 
     if ewmas.stat_1month.reliability - ewmas.stat_1month.weight + 1.0 < 0.20 && ewmas.stat_1month.count > 2.0  { return Some(Duration::from_secs(10*86400)); }
     if ewmas.stat_1week.reliability - ewmas.stat_1week.weight + 1.0 < 0.16 && ewmas.stat_1week.count > 2.0  { return Some(Duration::from_secs(3*86400));  }
