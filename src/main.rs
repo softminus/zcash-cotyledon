@@ -129,6 +129,7 @@ async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>>
                 if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = resp {
                     if candidate_peers.len() > 1 {
                         peers_vec = Some(candidate_peers.to_vec());
+                        println!("{:?}", peers_vec);
                         break;
                     }
                 }
@@ -349,37 +350,10 @@ async fn main()
     loop {
         let mut found_peer_addresses = Vec::new();
         for (proband_address, peer_stat) in internal_peer_tracker.iter_mut() {
-            let poll_time = Instant::now();
-            let poll_res = test_a_server(*proband_address).await;
-            let peers_res = probe_for_peers(*proband_address).await;
-            if let Some(peer_list) = peers_res {
-                for peer in peer_list {
-                    found_peer_addresses.push(peer.addr());
-                }
-                println!("found new peers: {:?}", found_peer_addresses);
-            }
-            println!("\n\n\n");
-            //println!("result = {:?}", poll_res);
-            peer_stat.total_attempts += 1;
-            match poll_res {
-                PollStatus::BlockRequestOK(new_peer_data) => {
-                    peer_stat.total_successes += 1;
-                    peer_stat.peer_derived_data = Some(new_peer_data);
-                    update_ewma_pack(&mut peer_stat.ewma_pack, peer_stat.last_polled, true);
-                }
-                PollStatus::BlockRequestFail(new_peer_data) => {
-                    peer_stat.peer_derived_data = Some(new_peer_data);
-                    update_ewma_pack(&mut peer_stat.ewma_pack, peer_stat.last_polled, false);
-                }
-                PollStatus::ConnectionFail() => {
-                    update_ewma_pack(&mut peer_stat.ewma_pack, peer_stat.last_polled, false);
-                }
-
-            }
-            peer_stat.last_polled_absolute = SystemTime::now();
-
-            peer_stat.last_polled = poll_time;
-           // println!("updated peer stats = {:?}", peer);
+            let mut probe_results = probe_and_update(proband_address, peer_stat).await;
+            *peer_stat = probe_results.0.clone();
+            found_peer_addresses.append(&mut probe_results.1);
+            println!("PROBE_RESULTS {:?}", probe_results);
         }
 
         for peer in &found_peer_addresses {
@@ -411,7 +385,46 @@ async fn main()
     //     test_a_server(peer_addr).await;
     //     sleep(Duration::new(5, 0));
     // }
-
-
     
+}
+
+
+
+
+
+
+async fn probe_and_update(proband_address: &SocketAddr, old_stats: &PeerStats) -> (PeerStats, Vec<SocketAddr>) {
+    let mut new_peer_stats = old_stats.clone();
+    let mut found_peer_addresses = Vec::new();
+    let poll_time = Instant::now();
+    let poll_res = test_a_server(*proband_address).await;
+    let peers_res = probe_for_peers(*proband_address).await;
+    if let Some(peer_list) = peers_res {
+        for peer in peer_list {
+            found_peer_addresses.push(peer.addr());
+        }
+        println!("found new peers: {:?}", found_peer_addresses);
+    }
+    println!("\n\n\n");
+    //println!("result = {:?}", poll_res);
+    new_peer_stats.total_attempts += 1;
+    match poll_res {
+        PollStatus::BlockRequestOK(new_peer_data) => {
+            new_peer_stats.total_successes += 1;
+            new_peer_stats.peer_derived_data = Some(new_peer_data);
+            update_ewma_pack(&mut new_peer_stats.ewma_pack, new_peer_stats.last_polled, true);
+        }
+        PollStatus::BlockRequestFail(new_peer_data) => {
+            new_peer_stats.peer_derived_data = Some(new_peer_data);
+            update_ewma_pack(&mut new_peer_stats.ewma_pack, new_peer_stats.last_polled, false);
+        }
+        PollStatus::ConnectionFail() => {
+            update_ewma_pack(&mut new_peer_stats.ewma_pack, new_peer_stats.last_polled, false);
+        }
+
+    }
+    new_peer_stats.last_polled_absolute = SystemTime::now();
+    new_peer_stats.last_polled = poll_time;
+    return (new_peer_stats, found_peer_addresses);
+
 }
