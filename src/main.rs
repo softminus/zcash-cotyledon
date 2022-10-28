@@ -359,7 +359,7 @@ async fn main()
         }
         println!("now let's make them run");
 
-        let stream = futures::stream::iter(handles).buffer_unordered(10);
+        let stream = futures::stream::iter(handles).buffer_unordered(64);
         let results = stream.collect::<Vec<_>>().await;
 //        println!("{:?}", results);
 
