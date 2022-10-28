@@ -9,6 +9,8 @@ use std::{
 };
 use futures_util::FutureExt;
 use std::collections::{HashSet, HashMap};
+use futures::stream::FuturesUnordered;
+use futures_util::StreamExt;
 use futures::future::join_all;
 use tower::Service;
 use zebra_chain::block::Hash;
@@ -22,6 +24,7 @@ use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
 use hex::FromHex;
 //use zebra_network::protocol::external::types::Version;
+use futures::prelude::*;
 
 use tonic::{transport::Server, Request as TonicRequest, Response as TonicResponse, Status};
 
@@ -325,7 +328,7 @@ async fn main()
 
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
-    let initial_peer_addrs = ["35.230.70.77:8233"];
+    let initial_peer_addrs = ["35.230.70.77:8233", "157.245.172.190:8233"];
     let mut internal_peer_tracker = HashMap::new();
 
 
@@ -349,47 +352,52 @@ async fn main()
 
     loop {
         let mut handles = Vec::new();
-        for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-            let handle = tokio::spawn(probe_and_update(proband_address.clone(), peer_stat.clone()));
-            handles.push(handle);
-            sleep(Duration::new(1,0));
-        }
+        let mut new_peer_hashmap = HashMap::new();
 
-        let resultands = join_all(handles).await;
-        for probe in resultands {
-            if let Ok(probe_results) = probe {
-                println!("RESULT {:?}",probe_results);
-                let new_peer_stat = probe_results.0.clone();
-                let peer_address  = probe_results.1;
-                let new_peers = probe_results.2;
-                internal_peer_tracker.insert(peer_address, new_peer_stat);
-                for peer in new_peers {
-                    let key = peer.to_socket_addrs().unwrap().next().unwrap();
-                    if !internal_peer_tracker.contains_key(&key) {
-                        let value = PeerStats {
-                            peer_classification: PeerClassification::Unknown,
-                            total_attempts: 0,
-                            total_successes: 0,
-                            ewma_pack: EWMAPack::default(),
-                            last_polled: Instant::now(),
-                            last_polled_absolute: SystemTime::now(),
-                            peer_derived_data: None
-                        };
-                        internal_peer_tracker.insert(key, value);
-                    }    
-                }
+        for (proband_address, peer_stat) in internal_peer_tracker.iter() {
+            handles.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
+        }
+        println!("now let's make them run");
+
+        let stream = futures::stream::iter(handles).buffer_unordered(10);
+        let results = stream.collect::<Vec<_>>().await;
+//        println!("{:?}", results);
+
+        for probe_result in results {
+            let new_peer_stat = probe_result.0.clone();
+            let peer_address  = probe_result.1;
+            let new_peers = probe_result.2;
+            println!("RESULT {:?}",peer_address);
+            new_peer_hashmap.insert(peer_address, new_peer_stat);
+            for peer in new_peers {
+                let key = peer.to_socket_addrs().unwrap().next().unwrap();
+                if !internal_peer_tracker.contains_key(&key) {
+                    let value = PeerStats {
+                        peer_classification: PeerClassification::Unknown,
+                        total_attempts: 0,
+                        total_successes: 0,
+                        ewma_pack: EWMAPack::default(),
+                        last_polled: Instant::now(),
+                        last_polled_absolute: SystemTime::now(),
+                        peer_derived_data: None
+                    };
+                    new_peer_hashmap.insert(key, value);
+                }    
             }
         }
-      
+        for (key, value) in new_peer_hashmap {
+            internal_peer_tracker.insert(key, value);
+        }
 
-
+        sleep(Duration::new(4, 0));
+    }
         //println!("{:?}", internal_peer_tracker);
 
         // let mut unlocked = peer_tracker_shared.lock().unwrap();
         // *unlocked = internal_peer_tracker.clone();
         // std::mem::drop(unlocked);
 
-    }
+    //}
     // .to_socket_addrs().unwrap().next().unwrap();
     // loop {
     //     //let peer_addr = SocketAddr::new(proband_ip, proband_port);
