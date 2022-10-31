@@ -364,7 +364,7 @@ async fn main()
         }
         println!("now let's make them run");
 
-        let mut stream = futures::stream::iter(handles).buffer_unordered(10);
+        let mut stream = futures::stream::iter(handles).buffer_unordered(1024000);
         //let results_stream = stream.collect::<Vec<_>>();
 
         while let Some(probe_result) = stream.next().await {
