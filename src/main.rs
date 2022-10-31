@@ -278,11 +278,10 @@ fn required_serving_version(network: Network) -> Version {
         Network::Testnet => {Version(170_040)}
     }
 }
-fn is_good_for_dns(peer: ExtendedPeerStats, network: Network) -> bool {
-    return is_good(&peer) && (peer.address.port() == network.default_port())
-}
 
 
+fn dns_servable(peer: ExtendedPeerStats, network: Network) -> bool {
+    return peer.address.port() == network.default_port();
 }
 
 
