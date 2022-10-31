@@ -195,11 +195,11 @@ struct EWMAPack{
 
 impl Default for EWMAPack {
     fn default() -> Self { EWMAPack {
-        stat_2_hours: EWMAState {scale: Duration::new(3600*2,0), ..Default::default()},
-        stat_8_hours: EWMAState {scale: Duration::new(3600*8,0), ..Default::default()},
-        stat_1day: EWMAState {scale: Duration::new(3600*24,0), ..Default::default()},
-        stat_1week: EWMAState {scale: Duration::new(3600*24*7,0), ..Default::default()},
-        stat_1month: EWMAState {scale: Duration::new(3600*24*30,0), ..Default::default()}
+        stat_2_hours: EWMAState {scale: Duration::new(3600*2,0),     ..Default::default()},
+        stat_8_hours: EWMAState {scale: Duration::new(3600*8,0),     ..Default::default()},
+        stat_1day:    EWMAState {scale: Duration::new(3600*24,0),    ..Default::default()},
+        stat_1week:   EWMAState {scale: Duration::new(3600*24*7,0),  ..Default::default()},
+        stat_1month:  EWMAState {scale: Duration::new(3600*24*30,0), ..Default::default()}
     }
     }
 }
