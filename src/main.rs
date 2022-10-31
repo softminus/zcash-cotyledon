@@ -262,9 +262,9 @@ fn is_good(peer: &ExtendedPeerStats) -> bool {
 
     if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0     {return true};
     if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0     {return true};
-    if ewmas.stat_1day.reliability > 0.55 && ewmas.stat_1day.count > 8.0           {return true};
-    if ewmas.stat_1week.reliability > 0.45 && ewmas.stat_1week.count > 16.0        {return true};
-    if ewmas.stat_1month.reliability > 0.35 && ewmas.stat_1month.count > 32.0      {return true};
+    if ewmas.stat_1day.reliability    > 0.55 && ewmas.stat_1day.count    > 8.0     {return true};
+    if ewmas.stat_1week.reliability   > 0.45 && ewmas.stat_1week.count   > 16.0    {return true};
+    if ewmas.stat_1month.reliability  > 0.35 && ewmas.stat_1month.count  > 32.0    {return true};
 
     return false;
 }
