@@ -288,26 +288,8 @@ fn check_last_height(peer: PeerStats, network: Network) -> bool {
 fn is_good_for_dns(peer: ExtendedPeerStats, network: Network) -> bool {
     return is_good(&peer) && (peer.address.port() == network.default_port())
 }
-fn get_ban_time(peer: ExtendedPeerStats) -> Option<Duration> {
-    if is_good(&peer) {return None}
-    // if (clientVersion && clientVersion < 31900) { return 604800; }
-    let ewmas = peer.stats.ewma_pack;
 
-    if ewmas.stat_1month.reliability - ewmas.stat_1month.weight + 1.0 < 0.15 && ewmas.stat_1month.count > 32.0 { return Some(Duration::from_secs(30*86400)); }
-    if ewmas.stat_1week.reliability - ewmas.stat_1week.weight + 1.0 < 0.10 && ewmas.stat_1week.count > 16.0 { return Some(Duration::from_secs(7*86400));  }
-    if ewmas.stat_1day.reliability - ewmas.stat_1day.weight + 1.0 < 0.05 && ewmas.stat_1day.count > 8.0  { return Some(Duration::from_secs(1*86400));  }
-    return None;
-}
 
-fn get_ignore_time(peer: ExtendedPeerStats) -> Option<Duration> {
-    if is_good(&peer) {return None}
-    let ewmas = peer.stats.ewma_pack;
-
-    if ewmas.stat_1month.reliability - ewmas.stat_1month.weight + 1.0 < 0.20 && ewmas.stat_1month.count > 2.0  { return Some(Duration::from_secs(10*86400)); }
-    if ewmas.stat_1week.reliability - ewmas.stat_1week.weight + 1.0 < 0.16 && ewmas.stat_1week.count > 2.0  { return Some(Duration::from_secs(3*86400));  }
-    if ewmas.stat_1day.reliability - ewmas.stat_1day.weight + 1.0 < 0.12 && ewmas.stat_1day.count > 2.0  { return Some(Duration::from_secs(8*3600));   }
-    if ewmas.stat_8_hours.reliability - ewmas.stat_8_hours.weight + 1.0 < 0.08 && ewmas.stat_8_hours.count > 2.0  { return Some(Duration::from_secs(2*3600));   }
-    return None;
 }
 
 
