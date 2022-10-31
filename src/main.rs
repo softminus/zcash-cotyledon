@@ -278,13 +278,6 @@ fn required_serving_version(network: Network) -> Version {
         Network::Testnet => {Version(170_040)}
     }
 }
-fn check_last_height(peer: PeerStats, network: Network) -> bool {
-    match peer.peer_derived_data {
-        Some(valid_data) => return valid_data.peer_height > required_height(network),
-        None => return false
-    }
-    
-}
 fn is_good_for_dns(peer: ExtendedPeerStats, network: Network) -> bool {
     return is_good(&peer) && (peer.address.port() == network.default_port())
 }
