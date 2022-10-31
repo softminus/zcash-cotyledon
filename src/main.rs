@@ -222,9 +222,9 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
     let sample_age = current.duration_since(last_polled);
     update_ewma(&mut prev.stat_2_hours, sample_age, sample);
     update_ewma(&mut prev.stat_8_hours, sample_age, sample);
-    update_ewma(&mut prev.stat_1day, sample_age, sample);
-    update_ewma(&mut prev.stat_1week, sample_age, sample);
-    update_ewma(&mut prev.stat_1month, sample_age, sample);
+    update_ewma(&mut prev.stat_1day,    sample_age, sample);
+    update_ewma(&mut prev.stat_1week,   sample_age, sample);
+    update_ewma(&mut prev.stat_1month,  sample_age, sample);
 }
 
 
