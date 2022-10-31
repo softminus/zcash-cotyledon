@@ -160,16 +160,11 @@ struct EWMAState {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PeerClassification {
-    MerelySyncedEnough, // NEW: Node can serve us a recent-enough block (likely synced/syncing to the zcash chain)
+    MerelySyncedEnough, // Node can serve us a recent-enough block (it is syncing or has synced to zcash chain)
                         // but doesn't meet uptime criteria.
-    Banned,             // Node is banned. Probably won't keep this one, since querying nodes is extremely efficient.
-    AllGood,            // KEEP: Node meets all the legacy criteria (including uptime), and is worth serving to clients
-    Bad,                // KEEP: Node is temporarily bad but not unsalvageable
-    Unknown,            // KEEP: We got told about this node but haven't yet queried it
-    ActiveQuery,        // Currently in the process of querying this node. 
-                        // We don't need this state since we don't need to persist this across runs,
-                        // and the way we do parallel querying means we don't need to mark the in-memory
-                        // db entry to prevent other threads from stepping on in-progress work.
+    AllGood,            // Node meets all the legacy criteria (including uptime), and is fully servable to clients
+    Bad,                // Node is bad for some reason
+    Unknown             // We got told about this node but haven't yet queried it
 }
 #[derive(Debug, Clone)]
 struct PeerStats {
