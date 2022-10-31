@@ -228,41 +228,49 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
 }
 
 
-fn is_good(peer: &ExtendedPeerStats) -> bool {
+fn get_classification(peer: &ExtendedPeerStats, network: Network) -> PeerClassification {
     let peer_stats = &peer.stats;
     let peer_address = &peer.address;
 
+    if peer_stats.total_attempts == 0 { // we never pinged them
+        return PeerClassification::Unknown;
+    }
+
     if peer_stats.peer_derived_data.is_none() {
-        return false;
+        return PeerClassification::Unknown;
     }
 
     let peer_derived_data = peer_stats.peer_derived_data.as_ref().unwrap();
 
     if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) {
-        return false;
+        return PeerClassification::Bad;
     }
 
-    if peer_derived_data.numeric_version < Version(170_100) {
-        return false;
+    if peer_derived_data.numeric_version < required_serving_version(network) {
+        return PeerClassification::Bad;
     }
 
-    if peer_derived_data.peer_height < Height(1_700_000) {
-        return false;
+    if peer_derived_data.peer_height < required_height(network) {
+        return PeerClassification::Bad;
     }
 
     if !peer_address.ip().is_global() {
-        return false;
+        return PeerClassification::Bad;
     }
     let ewmas = peer_stats.ewma_pack;
-    if peer_stats.total_attempts <= 3 && peer_stats.total_successes * 2 >= peer_stats.total_attempts {return true};
+    if peer_stats.total_attempts <= 3 && peer_stats.total_successes * 2 >= peer_stats.total_attempts {return PeerClassification::AllGood};
 
-    if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0     {return true};
-    if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0     {return true};
-    if ewmas.stat_1day.reliability    > 0.55 && ewmas.stat_1day.count    > 8.0     {return true};
-    if ewmas.stat_1week.reliability   > 0.45 && ewmas.stat_1week.count   > 16.0    {return true};
-    if ewmas.stat_1month.reliability  > 0.35 && ewmas.stat_1month.count  > 32.0    {return true};
+    if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0     {return PeerClassification::AllGood};
+    if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0     {return PeerClassification::AllGood};
+    if ewmas.stat_1day.reliability    > 0.55 && ewmas.stat_1day.count    > 8.0     {return PeerClassification::AllGood};
+    if ewmas.stat_1week.reliability   > 0.45 && ewmas.stat_1week.count   > 16.0    {return PeerClassification::AllGood};
+    if ewmas.stat_1month.reliability  > 0.35 && ewmas.stat_1month.count  > 32.0    {return PeerClassification::AllGood};
 
-    return false;
+    if peer_stats.ewma_pack.stat_2_hours.reliability != 0.0 { // OK response to block hash request in the past 2 hours
+        return PeerClassification::MerelySyncedEnough;
+    }
+
+    return PeerClassification::Bad;
 }
 
 fn required_height(network: Network) -> Height {
