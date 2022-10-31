@@ -312,7 +312,6 @@ async fn main()
     for peer in initial_peer_addrs {
         let key = peer.to_socket_addrs().unwrap().next().unwrap();
         let value = PeerStats {
-            peer_classification: PeerClassification::Unknown,
             total_attempts: 0,
             total_successes: 0,
             ewma_pack: EWMAPack::default(),
@@ -349,7 +348,6 @@ async fn main()
                 let key = peer.to_socket_addrs().unwrap().next().unwrap();
                 if !internal_peer_tracker.contains_key(&key) {
                     let value = PeerStats {
-                        peer_classification: PeerClassification::Unknown,
                         total_attempts: 0,
                         total_successes: 0,
                         ewma_pack: EWMAPack::default(),
