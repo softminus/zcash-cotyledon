@@ -101,17 +101,17 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
             let resp = z.call(Request::BlocksByHash(proband_hash_set)).await;
             match resp {
                 Ok(res) => {
-                println!("blocks by hash good: {}", res);
+                println!("blocks with {:?} by hash good: {}", peer_addr, res);
                 return PollStatus::BlockRequestOK(peer_derived_data)
             }
                 Err(error) => {
-                println!("blocks by hash error: {}", error);
+                println!("blocks with {:?} by hash error: {}", peer_addr, error);
                 return PollStatus::BlockRequestFail(peer_derived_data)
             }
             }
         } // ok connect
         Err(error) => {
-            println!("Connection failed: {:?}", error);
+            println!("Connection with {:?} failed: {:?}",peer_addr, error);
             return PollStatus::ConnectionFail();
         } // failed connect
     };
@@ -140,13 +140,14 @@ async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>>
             return peers_vec;
         } // ok connect
         Err(error) => {
-            println!("Peers connection failed: {:?}", error);
+            println!("Peers connection with {:?} failed: {:?}",peer_addr, error);
             return None;
         }
     };
 }
 
 
+//Connection with 74.208.91.217:8233 failed: Serialization(Parse("getblocks version did not match negotiation"))
 
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -359,7 +360,7 @@ async fn main()
         }
         println!("now let's make them run");
 
-        let stream = futures::stream::iter(handles).buffer_unordered(64);
+        let stream = futures::stream::iter(handles).buffer_unordered(10240);
         let results = stream.collect::<Vec<_>>().await;
 //        println!("{:?}", results);
 
@@ -388,7 +389,7 @@ async fn main()
         for (key, value) in new_peer_hashmap {
             internal_peer_tracker.insert(key, value);
         }
-
+        println!("HashMap len: {:?}", internal_peer_tracker.len());
         sleep(Duration::new(4, 0));
     }
         //println!("{:?}", internal_peer_tracker);
