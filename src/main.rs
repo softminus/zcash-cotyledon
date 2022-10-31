@@ -359,11 +359,12 @@ async fn main()
         }
         println!("now let's make them run");
 
-        let stream = futures::stream::iter(handles).buffer_unordered(10240);
-        let results = stream.collect::<Vec<_>>().await;
-        println!("RESULTS {:?}", results);
+        let mut stream = futures::stream::iter(handles).buffer_unordered(10);
+        //let results_stream = stream.collect::<Vec<_>>();
 
-        for probe_result in results {
+        while let Some(probe_result) = stream.next().await {
+            println!("probe_result {:?}", probe_result);
+
             let new_peer_stat = probe_result.0.clone();
             let peer_address  = probe_result.1;
             let new_peers = probe_result.2;
@@ -384,10 +385,10 @@ async fn main()
                     internal_peer_tracker.insert(key, value);
                 }    
             }
+        println!("HashMap len: {:?}", internal_peer_tracker.len());
         }
 
-        println!("HashMap len: {:?}", internal_peer_tracker.len());
-        sleep(Duration::new(4, 0));
+        sleep(Duration::new(1, 0));
     }
         //println!("{:?}", internal_peer_tracker);
 
