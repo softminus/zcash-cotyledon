@@ -353,7 +353,6 @@ async fn main()
 
     loop {
         let mut handles = Vec::new();
-        let mut new_peer_hashmap = HashMap::new();
 
         for (proband_address, peer_stat) in internal_peer_tracker.iter() {
             handles.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
@@ -362,14 +361,14 @@ async fn main()
 
         let stream = futures::stream::iter(handles).buffer_unordered(10240);
         let results = stream.collect::<Vec<_>>().await;
-//        println!("{:?}", results);
+        println!("RESULTS {:?}", results);
 
         for probe_result in results {
             let new_peer_stat = probe_result.0.clone();
             let peer_address  = probe_result.1;
             let new_peers = probe_result.2;
             println!("RESULT {:?}",peer_address);
-            new_peer_hashmap.insert(peer_address, new_peer_stat);
+            internal_peer_tracker.insert(peer_address, new_peer_stat);
             for peer in new_peers {
                 let key = peer.to_socket_addrs().unwrap().next().unwrap();
                 if !internal_peer_tracker.contains_key(&key) {
@@ -382,13 +381,11 @@ async fn main()
                         last_polled_absolute: SystemTime::now(),
                         peer_derived_data: None
                     };
-                    new_peer_hashmap.insert(key, value);
+                    internal_peer_tracker.insert(key, value);
                 }    
             }
         }
-        for (key, value) in new_peer_hashmap {
-            internal_peer_tracker.insert(key, value);
-        }
+
         println!("HashMap len: {:?}", internal_peer_tracker.len());
         sleep(Duration::new(4, 0));
     }
