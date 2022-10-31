@@ -160,15 +160,16 @@ struct EWMAState {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PeerClassification {
-    MerelySyncedEnough, // Node can serve us a recent-enough block (it is syncing or has synced to zcash chain)
+    MerelySyncedEnough, // Node recently could serve us a recent-enough block (it is syncing or has synced to zcash chain)
                         // but doesn't meet uptime criteria.
     AllGood,            // Node meets all the legacy criteria (including uptime), and is fully servable to clients
     Bad,                // Node is bad for some reason
     Unknown             // We got told about this node but haven't yet queried it
 }
+
+
 #[derive(Debug, Clone)]
 struct PeerStats {
-    peer_classification: PeerClassification,
     total_attempts: i32,
     total_successes: i32,
     ewma_pack: EWMAPack,
