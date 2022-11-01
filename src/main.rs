@@ -179,11 +179,7 @@ struct PeerStats {
     peer_derived_data: Option<PeerDerivedData>
 }
 
-#[derive(Debug, Clone)]
-struct ExtendedPeerStats {
-    address: SocketAddr,
-    stats:   PeerStats
-}
+
 #[derive(Debug, Clone, Copy)]
 struct EWMAPack{
     stat_2_hours: EWMAState,
@@ -228,9 +224,7 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
 }
 
 
-fn get_classification(peer: &ExtendedPeerStats, network: Network) -> PeerClassification {
-    let peer_stats = &peer.stats;
-    let peer_address = &peer.address;
+fn get_classification(peer_stats: &PeerStats, peer_address: &SocketAddr, network: Network) -> PeerClassification {
 
     if peer_stats.total_attempts == 0 { // we never pinged them
         return PeerClassification::Unknown;
@@ -288,8 +282,8 @@ fn required_serving_version(network: Network) -> Version {
 }
 
 
-fn dns_servable(peer: ExtendedPeerStats, network: Network) -> bool {
-    return peer.address.port() == network.default_port();
+fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
+    return peer_address.port() == network.default_port();
 }
 
 
