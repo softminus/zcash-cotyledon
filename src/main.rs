@@ -328,18 +328,18 @@ async fn main()
     //     k.peer_classification = PeerClassification::ActiveQuery;
     // }
 
-    loop {
-        let mut handles = Vec::new();
+    for _ in 1..3{
+        let mut handles = FuturesUnordered::new();
 
         for (proband_address, peer_stat) in &internal_peer_tracker {
             handles.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
         }
         println!("now let's make them run");
 
-        let mut stream = futures::stream::iter(handles).buffer_unordered(1024000);
+//        let mut stream = handles.buffer_unordered(10);
         //let results_stream = stream.collect::<Vec<_>>();
 
-        while let Some(probe_result) = stream.next().await {
+        while let Some(probe_result) = handles.next().await {
             //println!("probe_result {:?}", probe_result);
 
             let new_peer_stat = probe_result.0.clone();
@@ -358,14 +358,15 @@ async fn main()
                         last_polled_absolute: SystemTime::now(),
                         peer_derived_data: None
                     };
-                    internal_peer_tracker.insert(key, value);
+                    internal_peer_tracker.insert(key.clone(), value.clone());
+                    handles.push(probe_and_update(key.clone(), value.clone()));
                 }
             }
 
         println!("HashMap len: {:?}", internal_peer_tracker.len());
         }
 
-        sleep(Duration::new(10, 0));
+        //sleep(Duration::new(4, 0));
         let mut top_tier_nodes = Vec::new();
         let mut contingency_nodes = Vec::new();
 
