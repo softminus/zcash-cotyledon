@@ -331,7 +331,7 @@ async fn main()
     loop {
         let mut handles = Vec::new();
 
-        for (proband_address, peer_stat) in internal_peer_tracker.iter() {
+        for (proband_address, peer_stat) in &internal_peer_tracker {
             handles.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
         }
         println!("now let's make them run");
