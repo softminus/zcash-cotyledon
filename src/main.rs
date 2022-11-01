@@ -231,7 +231,8 @@ fn get_classification(peer_stats: &PeerStats, peer_address: &SocketAddr, network
     }
 
     if peer_stats.peer_derived_data.is_none() {
-        return PeerClassification::Unknown;
+        // we tried them, but haven't been able to negotiate a connection
+        return PeerClassification::Bad;
     }
 
     let peer_derived_data = peer_stats.peer_derived_data.as_ref().unwrap();
