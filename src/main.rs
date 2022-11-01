@@ -359,13 +359,29 @@ async fn main()
                         peer_derived_data: None
                     };
                     internal_peer_tracker.insert(key, value);
-                }    
+                }
             }
+
         println!("HashMap len: {:?}", internal_peer_tracker.len());
         }
 
-        sleep(Duration::new(1, 0));
+        sleep(Duration::new(10, 0));
+        let mut top_tier_nodes = Vec::new();
+        let mut contingency_nodes = Vec::new();
+
+        for (key, value) in &internal_peer_tracker {
+            let classification = get_classification(value, key, Network::Mainnet);
+            if classification == PeerClassification::AllGood {
+                top_tier_nodes.push(key);
+            }
+            if classification == PeerClassification::MerelySyncedEnough {
+                contingency_nodes.push(key);
+            }
+        }
+        println!("best nodes: {:?}", top_tier_nodes);
+        println!("contingency nodes: {:?}", contingency_nodes);
     }
+
         //println!("{:?}", internal_peer_tracker);
 
         // let mut unlocked = peer_tracker_shared.lock().unwrap();
