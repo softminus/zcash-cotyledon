@@ -339,7 +339,7 @@ async fn main()
         }
         println!("now let's make them run");
         let receiver_stream = UnboundedReceiverStream::new(rx);
-        let mut buffered = receiver_stream.buffer_unordered(32);
+        let mut buffered = receiver_stream.buffer_unordered(1024);
 
         while let Some(probe_result) = buffered.next().await {
             //println!("probe_result {:?}", probe_result);
