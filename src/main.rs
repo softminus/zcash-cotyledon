@@ -7,6 +7,9 @@ use std::sync::Mutex;
 use std::{
     sync::Arc,
 };
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::sync::mpsc::unbounded_channel;
+
 use futures_util::FutureExt;
 use std::collections::{HashSet, HashMap};
 use futures::stream::FuturesUnordered;
@@ -327,19 +330,18 @@ async fn main()
     // for k in internal_peer_tracker.iter_mut().filter(|x| x.peer_classification == PeerClassification::Unknown) {
     //     k.peer_classification = PeerClassification::ActiveQuery;
     // }
-
-    for _ in 1..3{
-        let mut handles = FuturesUnordered::new();
+    loop {
+    //    let mut handles = FuturesUnordered::new();
+        let (tx, rx) = unbounded_channel();
 
         for (proband_address, peer_stat) in &internal_peer_tracker {
-            handles.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
+            tx.send(probe_and_update(proband_address.clone(), peer_stat.clone()));
         }
         println!("now let's make them run");
+        let receiver_stream = UnboundedReceiverStream::new(rx);
+        let mut buffered = receiver_stream.buffer_unordered(32);
 
-//        let mut stream = handles.buffer_unordered(10);
-        //let results_stream = stream.collect::<Vec<_>>();
-
-        while let Some(probe_result) = handles.next().await {
+        while let Some(probe_result) = buffered.next().await {
             //println!("probe_result {:?}", probe_result);
 
             let new_peer_stat = probe_result.0.clone();
@@ -354,12 +356,12 @@ async fn main()
                         total_attempts: 0,
                         total_successes: 0,
                         ewma_pack: EWMAPack::default(),
-                        last_polled: Instant::now(),
+                        last_polled: Instant::now(), // this is inaccurate, we need a better way to handle not-yet-polled entries in the KV store
                         last_polled_absolute: SystemTime::now(),
                         peer_derived_data: None
                     };
                     internal_peer_tracker.insert(key.clone(), value.clone());
-                    handles.push(probe_and_update(key.clone(), value.clone()));
+                    tx.send(probe_and_update(key.clone(), value.clone()));
                 }
             }
 
