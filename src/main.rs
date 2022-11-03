@@ -222,7 +222,12 @@ fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
 }
 
 
-fn get_classification(peer_stats: &PeerStats, peer_address: &SocketAddr, network: Network) -> PeerClassification {
+fn get_classification(peer_stats: &Option<PeerStats>, peer_address: &SocketAddr, network: Network) -> PeerClassification {
+
+    let peer_stats = match peer_stats {
+        None => return PeerClassification::Unknown,
+        Some(peer_stats) => peer_stats,
+    };
 
     if peer_stats.total_attempts == 0 { // we never pinged them
         return PeerClassification::Unknown;
@@ -312,21 +317,16 @@ async fn main()
 
     for peer in initial_peer_addrs {
         let key = peer.to_socket_addrs().unwrap().next().unwrap();
-        let value = PeerStats {
-            total_attempts: 0,
-            total_successes: 0,
-            ewma_pack: EWMAPack::default(),
-            last_polled: Instant::now(),
-            last_polled_absolute: SystemTime::now(),
-            peer_derived_data: None
-        };
+        let value = None;
         internal_peer_tracker.insert(key, value);
     }
     // for k in internal_peer_tracker.iter_mut().filter(|x| x.peer_classification == PeerClassification::Unknown) {
     //     k.peer_classification = PeerClassification::ActiveQuery;
     // }
-    loop {
+    for _ in 1..2 {
     //    let mut handles = FuturesUnordered::new();
+        println!("starting Loop");
+
         let (tx, rx) = unbounded_channel();
 
         for (proband_address, peer_stat) in &internal_peer_tracker {
@@ -347,21 +347,15 @@ async fn main()
             for peer in new_peers {
                 let key = peer.to_socket_addrs().unwrap().next().unwrap();
                 if !internal_peer_tracker.contains_key(&key) {
-                    let value = PeerStats {
-                        total_attempts: 0,
-                        total_successes: 0,
-                        ewma_pack: EWMAPack::default(),
-                        last_polled: Instant::now(), // this is inaccurate, we need a better way to handle not-yet-polled entries in the KV store
-                        last_polled_absolute: SystemTime::now(),
-                        peer_derived_data: None
-                    };
-                    internal_peer_tracker.insert(key.clone(), value.clone());
-                    tx.send(probe_and_update(key.clone(), value.clone()));
+                    let value = <Option<PeerStats>>::None;
+                    //internal_peer_tracker.insert(key.clone(), value.clone());
+                    //tx.send(probe_and_update(key.clone(), value.clone()));
                 }
             }
 
         println!("HashMap len: {:?}", internal_peer_tracker.len());
         }
+        println!("done with getting results");
 
         //sleep(Duration::new(4, 0));
         let mut top_tier_nodes = Vec::new();
@@ -401,8 +395,18 @@ async fn main()
 
 
 
-async fn probe_and_update(proband_address: SocketAddr, old_stats: PeerStats) -> (PeerStats, SocketAddr, Vec<SocketAddr>) {
-    let mut new_peer_stats = old_stats.clone();
+async fn probe_and_update(proband_address: SocketAddr, old_stats: Option<PeerStats>) -> (Option<PeerStats>, SocketAddr, Vec<SocketAddr>) {
+    let mut new_peer_stats = match old_stats {
+        None => PeerStats {
+            total_attempts: 0,
+            total_successes: 0,
+            ewma_pack: EWMAPack::default(),
+            last_polled: Instant::now(),
+            last_polled_absolute: SystemTime::now(),
+            peer_derived_data: None
+        },
+        Some(old_stats) => old_stats.clone()
+    };
     let mut found_peer_addresses = Vec::new();
     let poll_time = Instant::now();
     let poll_res = test_a_server(proband_address).await;
@@ -432,6 +436,6 @@ async fn probe_and_update(proband_address: SocketAddr, old_stats: PeerStats) -> 
     }
     new_peer_stats.last_polled_absolute = SystemTime::now();
     new_peer_stats.last_polled = poll_time;
-    return (new_peer_stats, proband_address, found_peer_addresses);
+    return (Some(new_peer_stats), proband_address, found_peer_addresses);
 
 }
