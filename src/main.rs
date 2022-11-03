@@ -10,11 +10,8 @@ use std::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio::sync::mpsc::unbounded_channel;
 
-use futures_util::FutureExt;
 use std::collections::{HashSet, HashMap};
-use futures::stream::FuturesUnordered;
 use futures_util::StreamExt;
-use futures::future::join_all;
 use tower::Service;
 use zebra_chain::block::Hash;
 use zebra_network::{connect_isolated_tcp_direct, Request};
@@ -27,8 +24,6 @@ use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
 use hex::FromHex;
 //use zebra_network::protocol::external::types::Version;
-use futures::prelude::*;
-
 use tonic::{transport::Server, Request as TonicRequest, Response as TonicResponse, Status};
 
 use seeder_proto::seeder_server::{Seeder, SeederServer};
