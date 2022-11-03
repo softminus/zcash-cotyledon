@@ -323,7 +323,7 @@ async fn main()
     // for k in internal_peer_tracker.iter_mut().filter(|x| x.peer_classification == PeerClassification::Unknown) {
     //     k.peer_classification = PeerClassification::ActiveQuery;
     // }
-    for _ in 1..2 {
+    for _ in 1..3 {
     //    let mut handles = FuturesUnordered::new();
         println!("starting Loop");
 
@@ -342,13 +342,13 @@ async fn main()
             let new_peer_stat = probe_result.0.clone();
             let peer_address  = probe_result.1;
             let new_peers = probe_result.2;
-            println!("RESULT {:?}",peer_address);
+            println!("RESULT {:?}",new_peer_stat);
             internal_peer_tracker.insert(peer_address, new_peer_stat);
             for peer in new_peers {
                 let key = peer.to_socket_addrs().unwrap().next().unwrap();
                 if !internal_peer_tracker.contains_key(&key) {
                     let value = <Option<PeerStats>>::None;
-                    //internal_peer_tracker.insert(key.clone(), value.clone());
+                    internal_peer_tracker.insert(key.clone(), value.clone());
                     //tx.send(probe_and_update(key.clone(), value.clone()));
                 }
             }
