@@ -311,32 +311,28 @@ async fn main()
 //    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
     //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
     let initial_peer_addrs = ["35.230.70.77:8233", "157.245.172.190:8233"];
-    let mut internal_peer_tracker = HashMap::new();
-
-
+    let mut internal_peer_tracker: HashMap<SocketAddr, Option<PeerStats>> = HashMap::new();
 
     for peer in initial_peer_addrs {
         let key = peer.to_socket_addrs().unwrap().next().unwrap();
         let value = None;
         internal_peer_tracker.insert(key, value);
     }
-    // for k in internal_peer_tracker.iter_mut().filter(|x| x.peer_classification == PeerClassification::Unknown) {
-    //     k.peer_classification = PeerClassification::ActiveQuery;
-    // }
+
+
     for _ in 1..3 {
-    //    let mut handles = FuturesUnordered::new();
         println!("starting Loop");
 
-        let (tx, rx) = unbounded_channel();
-
+        let mut batch_queries = Vec::new();
         for (proband_address, peer_stat) in &internal_peer_tracker {
-            tx.send(probe_and_update(proband_address.clone(), peer_stat.clone()));
+            batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
         }
-        println!("now let's make them run");
-        let receiver_stream = UnboundedReceiverStream::new(rx);
-        let mut buffered = receiver_stream.buffer_unordered(1024);
 
-        while let Some(probe_result) = buffered.next().await {
+        let mut stream = futures::stream::iter(batch_queries).buffer_unordered(10);
+
+        println!("now let's make them run");
+
+        while let Some(probe_result) = stream.next().await {
             //println!("probe_result {:?}", probe_result);
 
             let new_peer_stat = probe_result.0.clone();
@@ -347,9 +343,7 @@ async fn main()
             for peer in new_peers {
                 let key = peer.to_socket_addrs().unwrap().next().unwrap();
                 if !internal_peer_tracker.contains_key(&key) {
-                    let value = <Option<PeerStats>>::None;
-                    internal_peer_tracker.insert(key.clone(), value.clone());
-                    //tx.send(probe_and_update(key.clone(), value.clone()));
+                    internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
                 }
             }
 
