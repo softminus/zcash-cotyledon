@@ -48,20 +48,21 @@ impl Seeder for SeedContext {
     ) -> Result<TonicResponse<SeedReply>, Status> { // Return an instance of type SeedReply
         println!("Got a request: {:?}", request);
         let serving_nodes_shared = self.serving_nodes_shared.lock().unwrap();
-        let mut contingency_strings = Vec::new();
-        let mut top_strings = Vec::new();
         
-        for peer in serving_nodes_shared.top_tier.iter() {
-            top_strings.push(format!("{:?}",peer))
+        let mut primary_nodes_strings   = Vec::new();
+        let mut alternate_nodes_strings = Vec::new();
+        
+        for peer in serving_nodes_shared.primaries.iter() {
+            primary_nodes_strings.push(format!("{:?}",peer))
         }
 
-        for peer in serving_nodes_shared.contingency.iter() {
-            contingency_strings.push(format!("{:?}",peer))
+        for peer in serving_nodes_shared.alternates.iter() {
+            alternate_nodes_strings.push(format!("{:?}",peer))
         }
 
         let reply = seeder_proto::SeedReply {
-            top:         top_strings,
-            contingency: contingency_strings
+            primaries:  primary_nodes_strings,
+            alternates: alternate_nodes_strings
         };
 
         Ok(TonicResponse::new(reply)) // Send back our formatted greeting
@@ -199,8 +200,8 @@ struct PeerStats {
 
 #[derive(Debug, Clone, Default)]
 struct ServingNodes {
-    top_tier:    Vec<SocketAddr>,
-    contingency: Vec<SocketAddr>
+    primaries:  Vec<SocketAddr>,
+    alternates: Vec<SocketAddr>
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -379,21 +380,21 @@ async fn main()
             println!("HashMap len: {:?}", internal_peer_tracker.len());
         }
         println!("done with getting results");
-        let mut top_tier_nodes = Vec::new();
-        let mut contingency_nodes = Vec::new();
+        let mut primary_nodes = Vec::new();
+        let mut alternate_nodes = Vec::new();
 
         for (key, value) in &internal_peer_tracker {
             let classification = get_classification(value, key, Network::Mainnet);
             if classification == PeerClassification::AllGood {
-                top_tier_nodes.push(key.clone());
+                primary_nodes.push(key.clone());
             }
             if classification == PeerClassification::MerelySyncedEnough {
-                contingency_nodes.push(key.clone());
+                alternate_nodes.push(key.clone());
             }
         }
-        println!("best nodes: {:?}", top_tier_nodes);
-        println!("contingency nodes: {:?}", contingency_nodes);
-        let new_nodes = ServingNodes {contingency: contingency_nodes, top_tier: top_tier_nodes};
+        println!("primary nodes: {:?}", primary_nodes);
+        println!("alternate nodes: {:?}", alternate_nodes);
+        let new_nodes = ServingNodes {primaries: primary_nodes, alternates: alternate_nodes};
         let mut unlocked = serving_nodes_shared.lock().unwrap();
         *unlocked = new_nodes.clone();
         std::mem::drop(unlocked);
