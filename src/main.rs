@@ -342,8 +342,9 @@ async fn main()
                     println!("Prioritized node query for {:?}", proband_address);
                     batch_queries.insert(0, probe_and_update(proband_address.clone(), peer_stat.clone()));
                 }
+            } else {
+                batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
             }
-            batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
         }
 
         let mut stream = futures::stream::iter(batch_queries).buffer_unordered(1024);
