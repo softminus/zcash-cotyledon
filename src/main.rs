@@ -332,7 +332,7 @@ async fn main()
     }
 
 
-    for _ in 1..3 {
+    for _ in 1..10 {
         println!("starting Loop");
 
         let mut batch_queries = Vec::new();
@@ -346,7 +346,7 @@ async fn main()
             batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
         }
 
-        let mut stream = futures::stream::iter(batch_queries).buffer_unordered(10);
+        let mut stream = futures::stream::iter(batch_queries).buffer_unordered(1024);
 
         println!("now let's make them run");
 
@@ -356,7 +356,7 @@ async fn main()
             let new_peer_stat = probe_result.0.clone();
             let peer_address  = probe_result.1;
             let new_peers = probe_result.2;
-            println!("RESULT {:?}",new_peer_stat);
+            println!("RESULT {} {:?}", peer_address, new_peer_stat);
             internal_peer_tracker.insert(peer_address, new_peer_stat);
             for peer in new_peers {
                 let key = peer.to_socket_addrs().unwrap().next().unwrap();
