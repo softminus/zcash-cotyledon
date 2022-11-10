@@ -29,7 +29,7 @@ tower = { version = "0.4.13", features = ["retry", "discover", "load", "load-she
 
 
 #hyper = { version = "0.14", features = ["full"] }
-
+trust-dns-server = "0.22.0"
 
 zebra-network = {path = "/Users/sasha_work/repos/zebra/zebra-network"}
 zebra-chain = {path = "/Users/sasha_work/repos/zebra/zebra-chain"}
