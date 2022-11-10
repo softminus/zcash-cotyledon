@@ -9,7 +9,7 @@ use std::{
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio::sync::mpsc::unbounded_channel;
-
+use std::str::FromStr;
 use std::collections::{HashSet, HashMap};
 use futures_util::StreamExt;
 use tower::Service;
@@ -20,6 +20,8 @@ use zebra_network::{
     ConnectedAddr, ConnectionInfo, Version, VersionMessage,
 };
 use zebra_chain::block::Height;
+use zebra_network::Response;
+use zebra_network::InventoryResponse;
 use std::thread::sleep;
 use std::net::{SocketAddr, ToSocketAddrs};
 use hex::FromHex;
@@ -78,11 +80,12 @@ struct PeerDerivedData {
 
 async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
 {
+    let hash_to_test = "000000000145f21eabd0024fbbb00384111644a5415b02bfe169b4fc300290e6";
     println!("Starting new connection: peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(Network::Mainnet, peer_addr, String::from("/Seeder-and-feeder:0.0.0-alpha0/"));
     let x = the_connection.await;
     let mut proband_hash_set = HashSet::new();
-    let proband_hash = <Hash>::from_hex("000000000145f21eabd0024fbbb00384111644a5415b02bfe169b4fc300290e6").expect("hex string failure");
+    let proband_hash = <Hash>::from_hex(hash_to_test).expect("hex string failure");
     proband_hash_set.insert(proband_hash);
     match x {
         Ok(mut z) => {
@@ -98,9 +101,18 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus
 
             let resp = z.call(Request::BlocksByHash(proband_hash_set)).await;
             match resp {
-                Ok(res) => {
-                println!("blocks with {:?} by hash good: {}", peer_addr, res);
-                return PollStatus::BlockRequestOK(peer_derived_data)
+                Ok(good_result) => {
+                if let Response::Blocks(block_vector) = good_result {
+                    for block_k in block_vector {
+                        if let InventoryResponse::Available(actual_block) = block_k {
+                            if actual_block.hash() == Hash::from_str(hash_to_test).unwrap() {
+                                println!("blocks with {:?} by hash good: {}", peer_addr, actual_block.hash());
+                                return PollStatus::BlockRequestOK(peer_derived_data)
+                            }
+                        }
+                    }
+                }
+                return PollStatus::BlockRequestFail(peer_derived_data) // it didn't hash so well
             }
                 Err(error) => {
                 println!("blocks with {:?} by hash error: {}", peer_addr, error);
