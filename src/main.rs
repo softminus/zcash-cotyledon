@@ -37,28 +37,28 @@ pub mod seeder_proto {
 
 #[derive(Debug)]
 pub struct SeedContext {
-    peer_tracker_shared: Arc<Mutex<Vec<PeerStats>>>
+    serving_nodes_shared: Arc<Mutex<ServingNodes>>
 }
 
-// #[tonic::async_trait]
-// impl Seeder for SeedContext {
-//     async fn seed(
-//         &self,
-//         request: TonicRequest<SeedRequest>, // Accept request of type SeedRequest
-//     ) -> Result<TonicResponse<SeedReply>, Status> { // Return an instance of type SeedReply
-//         println!("Got a request: {:?}", request);
-//         let peer_tracker_shared = self.peer_tracker_shared.lock().unwrap();
-//         let mut peer_strings = Vec::new();
-// //        for peer in peer_tracker_shared.iter() {
-// //            peer_strings.push(format!("{:?}",peer.address))
-// //        }
-//         let reply = seeder_proto::SeedReply {
-//             ip: peer_strings
-//         };
+#[tonic::async_trait]
+impl Seeder for SeedContext {
+    async fn seed(
+        &self,
+        request: TonicRequest<SeedRequest>, // Accept request of type SeedRequest
+    ) -> Result<TonicResponse<SeedReply>, Status> { // Return an instance of type SeedReply
+        println!("Got a request: {:?}", request);
+        let serving_nodes_shared = self.serving_nodes_shared.lock().unwrap();
+        let mut peer_strings = Vec::new();
+        for peer in serving_nodes_shared.contingency.iter() {
+           peer_strings.push(format!("{:?}",peer))
+        }
+        let reply = seeder_proto::SeedReply {
+            ip: peer_strings
+        };
 
-//         Ok(TonicResponse::new(reply)) // Send back our formatted greeting
-//     }
-// }
+        Ok(TonicResponse::new(reply)) // Send back our formatted greeting
+    }
+}
 
 
 
@@ -189,6 +189,11 @@ struct PeerStats {
     peer_derived_data: Option<PeerDerivedData>
 }
 
+#[derive(Debug, Clone, Default)]
+struct ServingNodes {
+    top_tier:    Vec<SocketAddr>,
+    contingency: Vec<SocketAddr>
+}
 
 #[derive(Debug, Clone, Copy)]
 struct EWMAPack{
@@ -307,21 +312,18 @@ fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
 #[tokio::main]
 async fn main()
 {
-//    let network = Network::Mainnet;
-//    println!("{:?}", required_height(network));
-    //let addr = "127.0.0.1:50051".parse().unwrap();
-    //let peer_tracker_shared = Arc::new(Mutex::new(Vec::new()));
+    let serving_nodes: ServingNodes = Default::default();
+    let serving_nodes_shared = Arc::new(Mutex::new(serving_nodes));
 
-    // let seedfeed = SeedContext {peer_tracker_shared: peer_tracker_shared.clone()};
+    let seedfeed = SeedContext {serving_nodes_shared: serving_nodes_shared.clone()};
+    let addr = "127.0.0.1:50051".parse().unwrap();
+    let seeder_service = Server::builder()
+        .add_service(SeederServer::new(seedfeed))
+        .serve(addr);
 
-    // let seeder_service = Server::builder()
-    //     .add_service(SeederServer::new(seedfeed))
-    //     .serve(addr);
+    tokio::spawn(seeder_service);
 
-    // tokio::spawn(seeder_service);
 
-//    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(34, 127, 5, 144)), 8233);
-    //let peer_addr = "157.245.172.190:8233".to_socket_addrs().unwrap().next().unwrap();
     let initial_peer_addrs = ["35.230.70.77:8233", "157.245.172.190:8233"];
     let mut internal_peer_tracker: HashMap<SocketAddr, Option<PeerStats>> = HashMap::new();
 
@@ -366,41 +368,31 @@ async fn main()
                 }
             }
 
-        println!("HashMap len: {:?}", internal_peer_tracker.len());
+            println!("HashMap len: {:?}", internal_peer_tracker.len());
         }
         println!("done with getting results");
-
-        //sleep(Duration::new(4, 0));
         let mut top_tier_nodes = Vec::new();
         let mut contingency_nodes = Vec::new();
 
         for (key, value) in &internal_peer_tracker {
             let classification = get_classification(value, key, Network::Mainnet);
             if classification == PeerClassification::AllGood {
-                top_tier_nodes.push(key);
+                top_tier_nodes.push(key.clone());
+                contingency_nodes.push(key.clone());
             }
             if classification == PeerClassification::MerelySyncedEnough {
-                contingency_nodes.push(key);
+                contingency_nodes.push(key.clone());
             }
         }
         println!("best nodes: {:?}", top_tier_nodes);
         println!("contingency nodes: {:?}", contingency_nodes);
+        let new_nodes = ServingNodes {contingency: contingency_nodes, top_tier: top_tier_nodes};
+        let mut unlocked = serving_nodes_shared.lock().unwrap();
+        *unlocked = new_nodes.clone();
+        std::mem::drop(unlocked);
     }
 
-        //println!("{:?}", internal_peer_tracker);
 
-        // let mut unlocked = peer_tracker_shared.lock().unwrap();
-        // *unlocked = internal_peer_tracker.clone();
-        // std::mem::drop(unlocked);
-
-    //}
-    // .to_socket_addrs().unwrap().next().unwrap();
-    // loop {
-    //     //let peer_addr = SocketAddr::new(proband_ip, proband_port);
-    //     test_a_server(peer_addr).await;
-    //     sleep(Duration::new(5, 0));
-    // }
-    
 }
 
 
