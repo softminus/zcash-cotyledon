@@ -337,6 +337,12 @@ async fn main()
 
         let mut batch_queries = Vec::new();
         for (proband_address, peer_stat) in &internal_peer_tracker {
+            if let Some(unwrapped_stats) = peer_stat {
+                if !unwrapped_stats.peer_derived_data.is_none() {
+                    println!("Prioritized node query for {:?}", proband_address);
+                    batch_queries.insert(0, probe_and_update(proband_address.clone(), peer_stat.clone()));
+                }
+            }
             batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
         }
 
