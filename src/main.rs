@@ -48,12 +48,20 @@ impl Seeder for SeedContext {
     ) -> Result<TonicResponse<SeedReply>, Status> { // Return an instance of type SeedReply
         println!("Got a request: {:?}", request);
         let serving_nodes_shared = self.serving_nodes_shared.lock().unwrap();
-        let mut peer_strings = Vec::new();
-        for peer in serving_nodes_shared.contingency.iter() {
-           peer_strings.push(format!("{:?}",peer))
+        let mut contingency_strings = Vec::new();
+        let mut top_strings = Vec::new();
+        
+        for peer in serving_nodes_shared.top_tier.iter() {
+            top_strings.push(format!("{:?}",peer))
         }
+
+        for peer in serving_nodes_shared.contingency.iter() {
+            contingency_strings.push(format!("{:?}",peer))
+        }
+
         let reply = seeder_proto::SeedReply {
-            ip: peer_strings
+            top:         top_strings,
+            contingency: contingency_strings
         };
 
         Ok(TonicResponse::new(reply)) // Send back our formatted greeting
@@ -378,7 +386,6 @@ async fn main()
             let classification = get_classification(value, key, Network::Mainnet);
             if classification == PeerClassification::AllGood {
                 top_tier_nodes.push(key.clone());
-                contingency_nodes.push(key.clone());
             }
             if classification == PeerClassification::MerelySyncedEnough {
                 contingency_nodes.push(key.clone());

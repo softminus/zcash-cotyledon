@@ -12,5 +12,6 @@ message SeedRequest {
 
 message SeedReply {
     // to start off just reply with a single string with the IP/port represented as human-readable text, we can look into sending multiple IPs or different encodings later
-    repeated string IP = 1;
+    repeated string top = 1;
+    repeated string contingency = 2;
 }
