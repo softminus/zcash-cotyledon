@@ -1,7 +1,7 @@
 #![feature(type_name_of_val)]
 #![feature(ip)]
 
-use futures_util::StreamExt;
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use hex::FromHex;
 use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, ToSocketAddrs, IpAddr};
@@ -423,7 +423,7 @@ fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
 
 enum CrawlingMode {
     FastAcquisition,
-    LongTerm
+    LongTermUpdates
 }
 
 #[tokio::main]
@@ -461,7 +461,15 @@ async fn main() {
 
     loop {
         println!("starting Loop");
-        slow_walker(&mut internal_peer_tracker).await;
+        match mode {
+            CrawlingMode::FastAcquisition => {
+                fast_walker(&mut internal_peer_tracker).await;
+                mode = CrawlingMode::LongTermUpdates;
+            },
+            CrawlingMode::LongTermUpdates => {
+                slow_walker(&mut internal_peer_tracker).await;
+            }
+        }
         println!("done with getting results");
         let mut primary_nodes = Vec::new();
         let mut alternate_nodes = Vec::new();
@@ -558,9 +566,6 @@ async fn slow_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<Peer
     }
 
     let mut stream = futures::stream::iter(batch_queries).buffer_unordered(8192);
-
-    println!("now let's make them run");
-
     while let Some(probe_result) = stream.next().await {
         //println!("probe_result {:?}", probe_result);
         let new_peer_stat = probe_result.0.clone();
@@ -572,6 +577,31 @@ async fn slow_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<Peer
             let key = peer.to_socket_addrs().unwrap().next().unwrap();
             if !internal_peer_tracker.contains_key(&key) {
                 internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+            }
+        }
+        println!("HashMap len: {:?}", internal_peer_tracker.len());
+    }
+}
+
+
+
+async fn fast_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>) {
+    let mut handles = FuturesUnordered::new();
+    for (proband_address, peer_stat) in internal_peer_tracker.iter() {
+        handles.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
+    }
+    while let Some(probe_result) = handles.next().await {
+        //println!("probe_result {:?}", probe_result);
+        let new_peer_stat = probe_result.0.clone();
+        let peer_address = probe_result.1;
+        let new_peers = probe_result.2;
+        println!("RESULT {} {:?}", peer_address, new_peer_stat);
+        internal_peer_tracker.insert(peer_address, new_peer_stat);
+        for peer in new_peers {
+            let key = peer.to_socket_addrs().unwrap().next().unwrap();
+            if !internal_peer_tracker.contains_key(&key) {
+                internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+                handles.push(probe_and_update(key.clone(), <Option<PeerStats>>::None));
             }
         }
         println!("HashMap len: {:?}", internal_peer_tracker.len());
