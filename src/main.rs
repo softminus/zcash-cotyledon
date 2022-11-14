@@ -470,6 +470,8 @@ async fn main() {
                 slow_walker(&serving_nodes_shared, &mut internal_peer_tracker).await;
             }
         }
+        update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
+
         println!("done with getting results");
     }
 }
@@ -491,6 +493,41 @@ fn update_serving_nodes(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     }
     println!("primary nodes: {:?}", primary_nodes);
     println!("alternate nodes: {:?}", alternate_nodes);
+    let new_nodes = ServingNodes {
+        primaries: primary_nodes,
+        alternates: alternate_nodes,
+    };
+
+    let mut unlocked = serving_nodes_shared.write().unwrap();
+    *unlocked = new_nodes.clone();
+}
+
+
+
+fn single_node_update(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+    new_peer_address: &SocketAddr,
+    new_peer_stat:   &Option<PeerStats>) {
+    let mut primary_nodes = Vec::new();
+    let mut alternate_nodes = Vec::new();
+
+    let old_nodes = serving_nodes_shared.read().unwrap();
+    primary_nodes = old_nodes.primaries.clone();
+    alternate_nodes = old_nodes.alternates.clone();
+    drop(old_nodes);
+
+    primary_nodes.retain(  |&x| x != *new_peer_address);
+    alternate_nodes.retain(|&x| x != *new_peer_address);
+
+    match get_classification(new_peer_stat, new_peer_address, Network::Mainnet) {
+        PeerClassification::AllGood => {
+            primary_nodes.push(new_peer_address.clone());
+        },
+        PeerClassification::MerelySyncedEnough => {
+            alternate_nodes.push(new_peer_address.clone());
+        },
+        _ => ()
+    }
+
     let new_nodes = ServingNodes {
         primaries: primary_nodes,
         alternates: alternate_nodes,
@@ -577,8 +614,8 @@ async fn slow_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
         let peer_address = probe_result.1;
         let new_peers = probe_result.2;
         println!("RESULT {} {:?}", peer_address, new_peer_stat);
-        internal_peer_tracker.insert(peer_address, new_peer_stat);
-        update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
+        internal_peer_tracker.insert(peer_address.clone(), new_peer_stat.clone());
+        single_node_update(&serving_nodes_shared, &peer_address, &new_peer_stat);
         for peer in new_peers {
             let key = peer.to_socket_addrs().unwrap().next().unwrap();
             if !internal_peer_tracker.contains_key(&key) {
@@ -603,8 +640,8 @@ async fn fast_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
         let peer_address = probe_result.1;
         let new_peers = probe_result.2;
         println!("RESULT {} {:?}", peer_address, new_peer_stat);
-        internal_peer_tracker.insert(peer_address, new_peer_stat);
-        update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
+        internal_peer_tracker.insert(peer_address.clone(), new_peer_stat.clone());
+        single_node_update(&serving_nodes_shared, &peer_address, &new_peer_stat);
         for peer in new_peers {
             let key = peer.to_socket_addrs().unwrap().next().unwrap();
             if !internal_peer_tracker.contains_key(&key) {
