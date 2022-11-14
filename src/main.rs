@@ -471,29 +471,34 @@ async fn main() {
             }
         }
         println!("done with getting results");
-        let mut primary_nodes = Vec::new();
-        let mut alternate_nodes = Vec::new();
+        update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
+    }
+}
 
-        for (key, value) in &internal_peer_tracker {
-            let classification = get_classification(value, key, Network::Mainnet);
-            if classification == PeerClassification::AllGood {
-                primary_nodes.push(key.clone());
-            }
-            if classification == PeerClassification::MerelySyncedEnough {
-                alternate_nodes.push(key.clone());
-            }
+
+fn update_serving_nodes(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+    internal_peer_tracker: &HashMap<SocketAddr, Option<PeerStats>>) {
+    let mut primary_nodes = Vec::new();
+    let mut alternate_nodes = Vec::new();
+
+    for (key, value) in internal_peer_tracker {
+        let classification = get_classification(&value, &key, Network::Mainnet);
+        if classification == PeerClassification::AllGood {
+            primary_nodes.push(key.clone());
         }
-        println!("primary nodes: {:?}", primary_nodes);
-        println!("alternate nodes: {:?}", alternate_nodes);
-        let new_nodes = ServingNodes {
-            primaries: primary_nodes,
-            alternates: alternate_nodes,
-        };
-        {
-            let mut unlocked = serving_nodes_shared.write().unwrap();
-            *unlocked = new_nodes.clone();
+        if classification == PeerClassification::MerelySyncedEnough {
+            alternate_nodes.push(key.clone());
         }
     }
+    println!("primary nodes: {:?}", primary_nodes);
+    println!("alternate nodes: {:?}", alternate_nodes);
+    let new_nodes = ServingNodes {
+        primaries: primary_nodes,
+        alternates: alternate_nodes,
+    };
+
+    let mut unlocked = serving_nodes_shared.write().unwrap();
+    *unlocked = new_nodes.clone();
 }
 
 async fn probe_and_update(
