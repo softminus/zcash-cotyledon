@@ -258,6 +258,7 @@ struct PeerStats {
     total_successes: i32,
     ewma_pack: EWMAPack,
     last_polled: Instant,
+    last_success: Option<Instant>,
     last_polled_absolute: SystemTime,
 
     peer_derived_data: Option<PeerDerivedData>,
@@ -389,11 +390,15 @@ fn get_classification(
         return PeerClassification::AllGood;
     };
 
-    if peer_stats.ewma_pack.stat_2_hours.reliability != 0.0 {
-        // OK response to block hash request in the past 2 hours
-        return PeerClassification::MerelySyncedEnough;
-    }
 
+
+
+    // at least one success in the last 2 hours
+    if let Some(last_success) = peer_stats.last_success {
+        if last_success.elapsed() <= Duration::from_secs(60*60*2) {
+            return PeerClassification::MerelySyncedEnough;
+        }
+    }
     return PeerClassification::Bad;
 }
 
@@ -522,6 +527,7 @@ async fn probe_and_update(
             total_successes: 0,
             ewma_pack: EWMAPack::default(),
             last_polled: Instant::now(),
+            last_success: None,
             last_polled_absolute: SystemTime::now(),
             peer_derived_data: None,
         },
@@ -543,6 +549,7 @@ async fn probe_and_update(
         PollStatus::BlockRequestOK(new_peer_data) => {
             new_peer_stats.total_successes += 1;
             new_peer_stats.peer_derived_data = Some(new_peer_data);
+            new_peer_stats.last_success = Some(Instant::now());
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
