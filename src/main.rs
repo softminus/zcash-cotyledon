@@ -463,15 +463,14 @@ async fn main() {
         println!("starting Loop");
         match mode {
             CrawlingMode::FastAcquisition => {
-                fast_walker(&mut internal_peer_tracker).await;
+                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker).await;
                 mode = CrawlingMode::LongTermUpdates;
             },
             CrawlingMode::LongTermUpdates => {
-                slow_walker(&mut internal_peer_tracker).await;
+                slow_walker(&serving_nodes_shared, &mut internal_peer_tracker).await;
             }
         }
         println!("done with getting results");
-        update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
     }
 }
 
@@ -564,7 +563,8 @@ async fn probe_and_update(
 
 
 
-async fn slow_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>) {
+async fn slow_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+    internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>) {
     let mut batch_queries = Vec::new();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
         batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
@@ -578,6 +578,7 @@ async fn slow_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<Peer
         let new_peers = probe_result.2;
         println!("RESULT {} {:?}", peer_address, new_peer_stat);
         internal_peer_tracker.insert(peer_address, new_peer_stat);
+        update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
         for peer in new_peers {
             let key = peer.to_socket_addrs().unwrap().next().unwrap();
             if !internal_peer_tracker.contains_key(&key) {
@@ -590,7 +591,8 @@ async fn slow_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<Peer
 
 
 
-async fn fast_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>) {
+async fn fast_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+    internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>) {
     let mut handles = FuturesUnordered::new();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
         handles.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
@@ -602,6 +604,7 @@ async fn fast_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<Peer
         let new_peers = probe_result.2;
         println!("RESULT {} {:?}", peer_address, new_peer_stat);
         internal_peer_tracker.insert(peer_address, new_peer_stat);
+        update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
         for peer in new_peers {
             let key = peer.to_socket_addrs().unwrap().next().unwrap();
             if !internal_peer_tracker.contains_key(&key) {
