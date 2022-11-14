@@ -513,17 +513,22 @@ fn single_node_update(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     let mut alternate_nodes = old_nodes.alternates.clone();
     drop(old_nodes);
 
-    primary_nodes.remove(new_peer_address);
-    alternate_nodes.remove(new_peer_address);
 
     match get_classification(new_peer_stat, new_peer_address, Network::Mainnet) {
         PeerClassification::AllGood => {
             primary_nodes.insert(new_peer_address.clone());
+            alternate_nodes.remove(new_peer_address);
+
         },
         PeerClassification::MerelySyncedEnough => {
+            primary_nodes.remove(new_peer_address);
             alternate_nodes.insert(new_peer_address.clone());
+
         },
-        _ => ()
+        _ => {
+            primary_nodes.remove(new_peer_address);
+            alternate_nodes.remove(new_peer_address);
+        }
     }
 
     let new_nodes = ServingNodes {
