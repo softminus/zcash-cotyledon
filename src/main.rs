@@ -137,8 +137,8 @@ struct PeerDerivedData {
     numeric_version: Version,
     peer_services: PeerServices,
     peer_height: Height,
-    user_agent: String,
-    relay: bool,
+    _user_agent: String,
+    _relay: bool,
 }
 
 async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
@@ -158,14 +158,14 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
             let numeric_version = z.connection_info.remote.version;
             let peer_services = z.connection_info.remote.services;
             let peer_height = z.connection_info.remote.start_height;
-            let user_agent = z.connection_info.remote.user_agent.clone();
-            let relay = z.connection_info.remote.relay;
+            let _user_agent = z.connection_info.remote.user_agent.clone();
+            let _relay = z.connection_info.remote.relay;
             let peer_derived_data = PeerDerivedData {
                 numeric_version,
                 peer_services,
                 peer_height,
-                user_agent,
-                relay,
+                _user_agent,
+                _relay,
             };
             // println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
             // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
