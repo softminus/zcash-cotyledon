@@ -6,7 +6,7 @@ use hex::FromHex;
 use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, ToSocketAddrs, IpAddr};
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime};
 use tower::Service;
@@ -28,7 +28,7 @@ pub mod seeder_proto {
 
 #[derive(Debug)]
 pub struct SeedContext {
-    serving_nodes_shared: Arc<Mutex<ServingNodes>>,
+    serving_nodes_shared: Arc<RwLock<ServingNodes>>,
 }
 
 #[tonic::async_trait]
@@ -39,7 +39,7 @@ impl Seeder for SeedContext {
     ) -> Result<TonicResponse<SeedReply>, Status> {
         // Return an instance of type SeedReply
         println!("Got a request: {:?}", request);
-        let serving_nodes = self.serving_nodes_shared.lock().unwrap();
+        let serving_nodes = self.serving_nodes_shared.read().unwrap();
 
         let mut primary_nodes_strings = Vec::new();
         let mut alternate_nodes_strings = Vec::new();
@@ -65,7 +65,7 @@ impl Seeder for SeedContext {
 
 #[derive(Clone, Debug)]
 pub struct DnsContext {
-    serving_nodes_shared: Arc<Mutex<ServingNodes>>,
+    serving_nodes_shared: Arc<RwLock<ServingNodes>>,
     serving_network: Network,
 }
 
@@ -111,7 +111,7 @@ impl DnsContext {
         header.set_authoritative(true);
         let mut records = Vec::new();
         {
-            let serving_nodes = self.serving_nodes_shared.lock().unwrap();
+            let serving_nodes = self.serving_nodes_shared.read().unwrap();
 
             for peer in serving_nodes.primaries.iter().chain(serving_nodes.alternates.iter()) {
                 if dns_servable(*peer, self.serving_network) {
@@ -419,7 +419,7 @@ fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
 #[tokio::main]
 async fn main() {
     let serving_nodes: ServingNodes = Default::default();
-    let serving_nodes_shared = Arc::new(Mutex::new(serving_nodes));
+    let serving_nodes_shared = Arc::new(RwLock::new(serving_nodes));
 
     let seedfeed = SeedContext {
         serving_nodes_shared: serving_nodes_shared.clone(),
@@ -506,9 +506,10 @@ async fn main() {
             primaries: primary_nodes,
             alternates: alternate_nodes,
         };
-        let mut unlocked = serving_nodes_shared.lock().unwrap();
-        *unlocked = new_nodes.clone();
-        std::mem::drop(unlocked);
+        {
+            let mut unlocked = serving_nodes_shared.write().unwrap();
+            *unlocked = new_nodes.clone();
+        }
     }
 }
 
