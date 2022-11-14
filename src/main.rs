@@ -420,6 +420,12 @@ fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
     return peer_address.port() == network.default_port();
 }
 
+
+enum CrawlingMode {
+    FastAcquisition,
+    LongTerm
+}
+
 #[tokio::main]
 async fn main() {
     let serving_nodes: ServingNodes = Default::default();
@@ -451,6 +457,7 @@ async fn main() {
         let value = None;
         internal_peer_tracker.insert(key, value);
     }
+    let mut mode = CrawlingMode::FastAcquisition;
 
     loop {
         println!("starting Loop");
