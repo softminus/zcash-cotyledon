@@ -64,20 +64,69 @@ impl Seeder for SeedContext {
 
 
 #[derive(Clone, Debug)]
-pub struct DnsHandler {}
+pub struct DnsContext {
+    serving_nodes_shared: Arc<Mutex<ServingNodes>>,
+    serving_network: Network,
+}
 
 #[async_trait::async_trait]
-impl trust_dns_server::server::RequestHandler for DnsHandler {
-    async fn handle_request<R: trust_dns_server::server::ResponseHandler>(
+impl dns::RequestHandler for DnsContext {
+    async fn handle_request<R: dns::ResponseHandler>(
         &self,
-        _request: &trust_dns_server::server::Request,
-        _response: R,
-    ) -> trust_dns_server::server::ResponseInfo {
-        todo!()
+        request: &dns::Request,
+        response: R,
+    ) -> dns::ResponseInfo {
+        match self.do_handle_request(request, response).await {
+            Some(response_info) => response_info,
+            None => {
+                println!("unable to respond to query {:?}", request);
+                let mut header = dnsop::Header::new();
+                header.set_response_code(dnsop::ResponseCode::ServFail);
+                header.into()
+            }
+        }
     }
 }
 
 
+impl DnsContext {
+    async fn do_handle_request<R: dns::ResponseHandler>(
+        &self,
+        request: &dns::Request,
+        mut response_handle: R,
+    ) -> Option<dns::ResponseInfo> {
+        if request.op_code() != dnsop::OpCode::Query {
+            return None;
+        }
+        if request.message_type() != dnsop::MessageType::Query {
+            return None;
+        }
+
+        let endpoint = dnsrr::LowerName::from(dnsrr::Name::from_str("dnsseed.z.cash").unwrap());
+
+        println!("query is {:?}", endpoint.zone_of(request.query().name()));
+
+        let builder = MessageResponseBuilder::from_message_request(request);
+        let mut header = dnsop::Header::response_from_request(request.header());
+        header.set_authoritative(true);
+        let mut records = Vec::new();
+        {
+            let serving_nodes = self.serving_nodes_shared.lock().unwrap();
+
+            for peer in serving_nodes.primaries.iter().chain(serving_nodes.alternates.iter()) {
+                if dns_servable(*peer, self.serving_network) {
+                    let rdata = match peer.ip() {
+                        IpAddr::V4(ipv4) => dnsrr::RData::A(ipv4),
+                        IpAddr::V6(ipv6) => dnsrr::RData::AAAA(ipv6),
+                    };
+                    records.push(dnsrr::Record::from_rdata(request.query().name().into(), 60, rdata))
+                }
+            }
+        }
+        let response = builder.build(header, records.iter(), &[], &[], &[]);
+        Some(response_handle.send_response(response).await.unwrap()) // fixme, handle failure OK.
+    }
+}
 #[derive(Debug, Clone)]
 enum PollStatus {
     ConnectionFail(),
@@ -379,16 +428,16 @@ async fn main() {
     let seeder_service = Server::builder()
         .add_service(SeederServer::new(seedfeed))
         .serve(addr);
+    tokio::spawn(seeder_service);
 
-    let dns_handler = DnsHandler{};
+    let dns_handler = DnsContext {
+        serving_nodes_shared: serving_nodes_shared.clone(),
+        serving_network: Network::Mainnet,
+    };
     let mut dns_server = trust_dns_server::ServerFuture::new(dns_handler);
     let dns_socket = "127.0.0.1:5300".to_socket_addrs().unwrap().next().unwrap();
     dns_server.register_socket(UdpSocket::bind(dns_socket).await.unwrap());
-    dns_server.block_until_done().await;
-
-    return ();
-
-    tokio::spawn(seeder_service);
+    tokio::spawn(dns_server.block_until_done());
 
     let initial_peer_addrs = ["35.230.70.77:8233", "157.245.172.190:8233"];
     let mut internal_peer_tracker: HashMap<SocketAddr, Option<PeerStats>> = HashMap::new();
