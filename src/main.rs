@@ -4,7 +4,7 @@
 use futures_util::StreamExt;
 use hex::FromHex;
 use std::collections::{HashMap, HashSet};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::{SocketAddr, ToSocketAddrs, IpAddr};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -17,7 +17,7 @@ use zebra_network::{connect_isolated_tcp_direct, InventoryResponse, Request, Res
 //use zebra_network::protocol::external::types::Version;
 use tonic::transport::Server;
 use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
-use trust_dns_server;
+use trust_dns_server::{authority::MessageResponseBuilder, client::rr as dnsrr, proto::op as dnsop, server as dns};
 use tokio::net::UdpSocket;
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedReply, SeedRequest};
