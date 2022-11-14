@@ -461,7 +461,7 @@ async fn main() {
 
     loop {
         println!("starting Loop");
-        slow_walker(&mut internal_peer_tracker);
+        slow_walker(&mut internal_peer_tracker).await;
         println!("done with getting results");
         let mut primary_nodes = Vec::new();
         let mut alternate_nodes = Vec::new();
@@ -554,26 +554,15 @@ async fn probe_and_update(
 async fn slow_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>) {
     let mut batch_queries = Vec::new();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        if let Some(unwrapped_stats) = peer_stat {
-            if !unwrapped_stats.peer_derived_data.is_none() {
-                println!("Prioritized node query for {:?}", proband_address);
-                batch_queries.insert(
-                    0,
-                    probe_and_update(proband_address.clone(), peer_stat.clone()),
-                );
-            }
-        } else {
-            batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
-        }
+        batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
     }
 
-    let mut stream = futures::stream::iter(batch_queries).buffer_unordered(1024);
+    let mut stream = futures::stream::iter(batch_queries).buffer_unordered(8192);
 
     println!("now let's make them run");
 
     while let Some(probe_result) = stream.next().await {
         //println!("probe_result {:?}", probe_result);
-
         let new_peer_stat = probe_result.0.clone();
         let peer_address = probe_result.1;
         let new_peers = probe_result.2;
@@ -585,7 +574,6 @@ async fn slow_walker(internal_peer_tracker: &mut HashMap<SocketAddr, Option<Peer
                 internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
             }
         }
-
         println!("HashMap len: {:?}", internal_peer_tracker.len());
     }
 }
