@@ -306,15 +306,15 @@ impl Default for EWMAPack {
 }
 fn update_ewma(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     let weight_factor = (-sample_age.as_secs_f64() / prev.scale.as_secs_f64()).exp();
+    // I don't understand what `count` and `weight` compute and why:
+    prev.count = prev.count * weight_factor + 1.0;
+    // `weight` only got used for `ignore` and `ban`, both features we left behind
+    prev.weight = prev.weight * weight_factor + (1.0 - weight_factor);
 
     let sample_value: f64 = sample as i32 as f64;
     //println!("sample_value is: {}, weight_factor is {}", sample_value, weight_factor);
     prev.reliability = prev.reliability * weight_factor + sample_value * (1.0 - weight_factor);
 
-    // I don't understand what this and the following line do
-    prev.count = prev.count * weight_factor + 1.0;
-
-    prev.weight = prev.weight * weight_factor + (1.0 - weight_factor);
 }
 
 fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
