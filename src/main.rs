@@ -266,8 +266,8 @@ struct PeerStats {
 
 #[derive(Debug, Clone, Default)]
 struct ServingNodes {
-    primaries: Vec<SocketAddr>,
-    alternates: Vec<SocketAddr>,
+    primaries:  HashSet<SocketAddr>,
+    alternates: HashSet<SocketAddr>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -479,16 +479,16 @@ async fn main() {
 
 fn update_serving_nodes(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     internal_peer_tracker: &HashMap<SocketAddr, Option<PeerStats>>) {
-    let mut primary_nodes = Vec::new();
-    let mut alternate_nodes = Vec::new();
+    let mut primary_nodes   = HashSet::new();
+    let mut alternate_nodes = HashSet::new();
 
     for (key, value) in internal_peer_tracker {
         let classification = get_classification(&value, &key, Network::Mainnet);
         if classification == PeerClassification::AllGood {
-            primary_nodes.push(key.clone());
+            primary_nodes.insert(key.clone());
         }
         if classification == PeerClassification::MerelySyncedEnough {
-            alternate_nodes.push(key.clone());
+            alternate_nodes.insert(key.clone());
         }
     }
     println!("primary nodes: {:?}", primary_nodes);
@@ -507,23 +507,21 @@ fn update_serving_nodes(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
 fn single_node_update(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     new_peer_address: &SocketAddr,
     new_peer_stat:   &Option<PeerStats>) {
-    let mut primary_nodes = Vec::new();
-    let mut alternate_nodes = Vec::new();
 
     let old_nodes = serving_nodes_shared.read().unwrap();
-    primary_nodes = old_nodes.primaries.clone();
-    alternate_nodes = old_nodes.alternates.clone();
+    let mut primary_nodes = old_nodes.primaries.clone();
+    let mut alternate_nodes = old_nodes.alternates.clone();
     drop(old_nodes);
 
-    primary_nodes.retain(  |&x| x != *new_peer_address);
-    alternate_nodes.retain(|&x| x != *new_peer_address);
+    primary_nodes.remove(new_peer_address);
+    alternate_nodes.remove(new_peer_address);
 
     match get_classification(new_peer_stat, new_peer_address, Network::Mainnet) {
         PeerClassification::AllGood => {
-            primary_nodes.push(new_peer_address.clone());
+            primary_nodes.insert(new_peer_address.clone());
         },
         PeerClassification::MerelySyncedEnough => {
-            alternate_nodes.push(new_peer_address.clone());
+            alternate_nodes.insert(new_peer_address.clone());
         },
         _ => ()
     }
