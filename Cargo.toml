@@ -37,6 +37,7 @@ zebra-state = {path= "/Users/sasha_work/repos/zebra/zebra-state"}
 
 tonic = "0.7"
 prost = "0.10"
+async-trait = "0.1.58"
 
 [build-dependencies]
 tonic-build = "0.7"

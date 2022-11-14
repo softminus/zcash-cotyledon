@@ -18,7 +18,7 @@ use zebra_network::{connect_isolated_tcp_direct, InventoryResponse, Request, Res
 use tonic::transport::Server;
 use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
 use trust_dns_server;
-
+use tokio::net::UdpSocket;
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedReply, SeedRequest};
 use zebra_network::types::MetaAddr;
@@ -60,6 +60,23 @@ impl Seeder for SeedContext {
         Ok(TonicResponse::new(reply)) // Send back our formatted greeting
     }
 }
+
+
+
+#[derive(Clone, Debug)]
+pub struct DnsHandler {}
+
+#[async_trait::async_trait]
+impl trust_dns_server::server::RequestHandler for DnsHandler {
+    async fn handle_request<R: trust_dns_server::server::ResponseHandler>(
+        &self,
+        _request: &trust_dns_server::server::Request,
+        _response: R,
+    ) -> trust_dns_server::server::ResponseInfo {
+        todo!()
+    }
+}
+
 
 #[derive(Debug, Clone)]
 enum PollStatus {
@@ -363,6 +380,14 @@ async fn main() {
         .add_service(SeederServer::new(seedfeed))
         .serve(addr);
 
+    let dns_handler = DnsHandler{};
+    let mut dns_server = trust_dns_server::ServerFuture::new(dns_handler);
+    let dns_socket = "127.0.0.1:5300".to_socket_addrs().unwrap().next().unwrap();
+    dns_server.register_socket(UdpSocket::bind(dns_socket).await.unwrap());
+    dns_server.block_until_done().await;
+
+    return ();
+
     tokio::spawn(seeder_service);
 
     let initial_peer_addrs = ["35.230.70.77:8233", "157.245.172.190:8233"];
@@ -374,7 +399,7 @@ async fn main() {
         internal_peer_tracker.insert(key, value);
     }
 
-    for _ in 1..10 {
+    loop {
         println!("starting Loop");
 
         let mut batch_queries = Vec::new();
