@@ -344,7 +344,7 @@ fn get_classification(
     }
 
     if peer_stats.peer_derived_data.is_none() {
-        // we tried them, but haven't been able to negotiate a connection
+        // we tried, but never been able to negotiate a connection
         return PeerClassification::Bad;
     }
 
