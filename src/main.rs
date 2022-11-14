@@ -39,16 +39,16 @@ impl Seeder for SeedContext {
     ) -> Result<TonicResponse<SeedReply>, Status> {
         // Return an instance of type SeedReply
         println!("Got a request: {:?}", request);
-        let serving_nodes_shared = self.serving_nodes_shared.lock().unwrap();
+        let serving_nodes = self.serving_nodes_shared.lock().unwrap();
 
         let mut primary_nodes_strings = Vec::new();
         let mut alternate_nodes_strings = Vec::new();
 
-        for peer in serving_nodes_shared.primaries.iter() {
+        for peer in serving_nodes.primaries.iter() {
             primary_nodes_strings.push(format!("{:?}", peer))
         }
 
-        for peer in serving_nodes_shared.alternates.iter() {
+        for peer in serving_nodes.alternates.iter() {
             alternate_nodes_strings.push(format!("{:?}", peer))
         }
 
