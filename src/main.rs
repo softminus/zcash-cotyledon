@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, ToSocketAddrs, IpAddr};
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, SystemTime};
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;
@@ -317,9 +317,17 @@ fn update_ewma(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
 
 }
 
-fn update_ewma_pack(prev: &mut EWMAPack, last_polled: Instant, sample: bool) {
-    let current = Instant::now();
-    let sample_age = current.duration_since(last_polled);
+fn update_ewma_pack(prev: &mut EWMAPack,
+    previous_polling_time: Option<SystemTime>,
+    current_polling_time: SystemTime,
+    sample: bool) {
+    let mut sample_age = Duration::from_secs(60*60*2); // default weighting, in case we haven't polled it yet
+
+    if let Some(previous_polling_time) = previous_polling_time {
+        if let Ok(duration) = current_polling_time.duration_since(previous_polling_time) {
+            sample_age = duration
+        }
+    }
     update_ewma(&mut prev.stat_2_hours, sample_age, sample);
     update_ewma(&mut prev.stat_8_hours, sample_age, sample);
     update_ewma(&mut prev.stat_1day,    sample_age, sample);
@@ -394,8 +402,10 @@ fn get_classification(
 
     // at least one success in the last 2 hours
     if let Some(last_success) = peer_stats.last_success {
-        if last_success.elapsed() <= Duration::from_secs(60*60*2) {
-            return PeerClassification::MerelySyncedEnough;
+        if let Ok(duration) = last_success.elapsed() {
+            if duration <= Duration::from_secs(60*60*2) {
+                return PeerClassification::MerelySyncedEnough;
+            }
         }
     }
     return PeerClassification::Bad;
@@ -550,15 +560,14 @@ async fn probe_and_update(
             total_attempts: 0,
             total_successes: 0,
             ewma_pack: EWMAPack::default(),
-            last_polled: Instant::now(),
+            last_polled: None,
             last_success: None,
-            last_polled_absolute: SystemTime::now(),
             peer_derived_data: None,
         },
         Some(old_stats) => old_stats.clone(),
     };
     let mut found_peer_addresses = Vec::new();
-    let poll_time = Instant::now();
+    let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let poll_res = test_a_server(proband_address).await;
     let peers_res = probe_for_peers(proband_address).await;
     if let Some(peer_list) = peers_res {
@@ -573,10 +582,11 @@ async fn probe_and_update(
         PollStatus::BlockRequestOK(new_peer_data) => {
             new_peer_stats.total_successes += 1;
             new_peer_stats.peer_derived_data = Some(new_peer_data);
-            new_peer_stats.last_success = Some(Instant::now());
+            new_peer_stats.last_success = Some(SystemTime::now());
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
+                current_poll_time,
                 true,
             );
         }
@@ -585,6 +595,7 @@ async fn probe_and_update(
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
+                current_poll_time,
                 false,
             );
         }
@@ -592,12 +603,12 @@ async fn probe_and_update(
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
+                current_poll_time,
                 false,
             );
         }
     }
-    new_peer_stats.last_polled_absolute = SystemTime::now();
-    new_peer_stats.last_polled = poll_time;
+    new_peer_stats.last_polled = Some(current_poll_time);
     return (Some(new_peer_stats), proband_address, found_peer_addresses);
 }
 
