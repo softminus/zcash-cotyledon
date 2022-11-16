@@ -257,9 +257,8 @@ struct PeerStats {
     total_attempts: i32,
     total_successes: i32,
     ewma_pack: EWMAPack,
-    last_polled: Instant,
-    last_success: Option<Instant>,
-    last_polled_absolute: SystemTime,
+    last_polled: Option<SystemTime>,
+    last_success: Option<SystemTime>,
 
     peer_derived_data: Option<PeerDerivedData>,
 }
