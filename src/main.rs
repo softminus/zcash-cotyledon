@@ -467,9 +467,11 @@ async fn main() {
                 mode = CrawlingMode::LongTermUpdates;
             },
             CrawlingMode::LongTermUpdates => {
+                return ();
                 slow_walker(&serving_nodes_shared, &mut internal_peer_tracker).await;
             }
         }
+        // just in case...we could add code to check if this does anything to find bugs with the incremental update
         update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
 
         println!("done with getting results");
