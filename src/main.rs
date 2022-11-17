@@ -154,6 +154,25 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
     let mut proband_hash_set = HashSet::new();
     let proband_hash = <Hash>::from_hex(hash_to_test).expect("hex string failure");
     proband_hash_set.insert(proband_hash);
+
+    let checkpoint = CheckpointList::new(Network::Mainnet);
+    let mut proband_heights = HashSet::new();
+    let mut proband_hashes  = HashSet::new();
+    for offset in (0..3200).rev() {
+        if let Some(ht) = checkpoint.min_height_in_range((checkpoint.max_height()-offset).unwrap()..) {
+            proband_heights.insert(ht);
+        }
+    }
+    let mut proband_heights_vec = Vec::from_iter(proband_heights);
+    proband_heights_vec.sort();
+    for proband_height in proband_heights_vec.iter().rev().take(8) {
+        println!("height {:?}",proband_height);
+        if let Some(hash) = checkpoint.hash(*proband_height) {
+            proband_hashes.insert(hash);
+        }
+    }
+    println!("{:?}", proband_hashes);
+
     if let Ok(x) = x {
 
     match x {
@@ -174,7 +193,7 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
             // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
             // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
 
-            let resp = z.call(Request::BlocksByHash(proband_hash_set)).await;
+            let resp = z.call(Request::BlocksByHash(proband_hashes)).await;
             match resp {
                 Ok(good_result) => {
                     if let Response::Blocks(block_vector) = good_result {
@@ -453,22 +472,6 @@ enum CrawlingMode {
 
 #[tokio::main]
 async fn main() {
-    let checkpoint = CheckpointList::new(Network::Mainnet);
-    let mut proband_heights = HashSet::new();
-    let mut proband_hashes  = HashSet::new();
-    for offset in (0..3200).rev() {
-        if let Some(ht) = checkpoint.min_height_in_range((checkpoint.max_height()-offset).unwrap()..) {
-            proband_heights.insert(ht);
-        }
-    }
-    let mut proband_heights_vec = Vec::from_iter(proband_heights);
-    proband_heights_vec.sort();
-    for proband_height in proband_heights_vec.iter().rev().take(8) {
-        println!("height {:?}",proband_height);
-        proband_hashes.insert(checkpoint.hash(*proband_height));
-    }
-    println!("{:?}", proband_hashes);
-
     let serving_nodes: ServingNodes = Default::default();
     let serving_nodes_shared = Arc::new(RwLock::new(serving_nodes));
 
