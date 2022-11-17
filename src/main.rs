@@ -1,6 +1,4 @@
-#![feature(type_name_of_val)]
 #![feature(ip)]
-
 use futures_util::{StreamExt, stream::FuturesUnordered};
 use hex::FromHex;
 use std::collections::{HashMap, HashSet};
@@ -18,6 +16,7 @@ use tonic::transport::Server;
 use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
 use trust_dns_server::{authority::MessageResponseBuilder, client::rr as dnsrr, proto::op as dnsop, server as dns};
 use tokio::net::UdpSocket;
+use tokio::time::timeout;
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedReply, SeedRequest};
 use zebra_network::types::MetaAddr;
@@ -149,10 +148,13 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
         peer_addr,
         String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
     );
+    let the_connection = timeout(Duration::from_secs(3), the_connection);
     let x = the_connection.await;
     let mut proband_hash_set = HashSet::new();
     let proband_hash = <Hash>::from_hex(hash_to_test).expect("hex string failure");
     proband_hash_set.insert(proband_hash);
+    if let Ok(x) = x {
+
     match x {
         Ok(mut z) => {
             let numeric_version = z.connection_info.remote.version;
@@ -201,6 +203,11 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
             return PollStatus::ConnectionFail();
         } // failed connect
     };
+} else {
+        println!("Probe connection with {:?} TIMED OUT: {:?}", peer_addr, x);
+
+ PollStatus::ConnectionFail()
+}
 }
 
 async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>> {
@@ -210,7 +217,10 @@ async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>> {
         peer_addr,
         String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
     );
+    let the_connection = timeout(Duration::from_secs(3), the_connection);
     let x = the_connection.await;
+    if let Ok(x) = x {
+
     match x {
         Ok(mut z) => {
             let mut peers_vec: Option<Vec<MetaAddr>> = None;
@@ -231,6 +241,11 @@ async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>> {
             return None;
         }
     };
+} else {
+        println!("Peers connection with {:?} TIMED OUT: {:?}", peer_addr, x);
+        None
+
+}
 }
 
 //Connection with 74.208.91.217:8233 failed: Serialization(Parse("getblocks version did not match negotiation"))
