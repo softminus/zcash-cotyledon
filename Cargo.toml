@@ -34,6 +34,7 @@ trust-dns-server = "0.22.0"
 zebra-network = {path = "/Users/sasha_work/repos/zebra/zebra-network"}
 zebra-chain = {path = "/Users/sasha_work/repos/zebra/zebra-chain"}
 zebra-state = {path= "/Users/sasha_work/repos/zebra/zebra-state"}
+zebra-consensus = {path= "/Users/sasha_work/repos/zebra/zebra-consensus"}
 
 tonic = "0.7"
 prost = "0.10"

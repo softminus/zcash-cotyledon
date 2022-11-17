@@ -20,6 +20,7 @@ use tokio::time::timeout;
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedReply, SeedRequest};
 use zebra_network::types::MetaAddr;
+use zebra_consensus::CheckpointList;
 pub mod seeder_proto {
     tonic::include_proto!("seeder"); // The string specified here must match the proto package name
 }
@@ -452,6 +453,22 @@ enum CrawlingMode {
 
 #[tokio::main]
 async fn main() {
+    let checkpoint = CheckpointList::new(Network::Mainnet);
+    let mut proband_heights = HashSet::new();
+    let mut proband_hashes  = HashSet::new();
+    for offset in (0..3200).rev() {
+        if let Some(ht) = checkpoint.min_height_in_range((checkpoint.max_height()-offset).unwrap()..) {
+            proband_heights.insert(ht);
+        }
+    }
+    let mut proband_heights_vec = Vec::from_iter(proband_heights);
+    proband_heights_vec.sort();
+    for proband_height in proband_heights_vec.iter().rev().take(8) {
+        println!("height {:?}",proband_height);
+        proband_hashes.insert(checkpoint.hash(*proband_height));
+    }
+    println!("{:?}", proband_hashes);
+
     let serving_nodes: ServingNodes = Default::default();
     let serving_nodes_shared = Arc::new(RwLock::new(serving_nodes));
 
