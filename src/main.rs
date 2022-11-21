@@ -149,7 +149,7 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
         peer_addr,
         String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
     );
-    let the_connection = timeout(Duration::from_secs(3), the_connection);
+    let the_connection = timeout(Duration::from_secs(10), the_connection);
     let x = the_connection.await;
     let mut proband_hash_set = HashSet::new();
     let proband_hash = <Hash>::from_hex(hash_to_test).expect("hex string failure");
@@ -165,14 +165,13 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
     }
     let mut proband_heights_vec = Vec::from_iter(proband_heights);
     proband_heights_vec.sort();
-    for proband_height in proband_heights_vec.iter().rev().take(8) {
-        println!("height {:?}",proband_height);
+    for proband_height in proband_heights_vec.iter().rev().take(2) {
         if let Some(hash) = checkpoint.hash(*proband_height) {
             proband_hashes.insert(hash);
+            println!("height {:?} has hash {:?}",proband_height, hash);
         }
     }
-    println!("{:?}", proband_hashes);
-
+    
     if let Ok(x) = x {
 
     match x {
@@ -193,24 +192,30 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
             // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
             // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
 
-            let resp = z.call(Request::BlocksByHash(proband_hashes)).await;
+            let resp = z.call(Request::BlocksByHash(proband_hashes.clone())).await;
+            println!("hash query response is {:?}", resp);
             match resp {
                 Ok(good_result) => {
                     if let Response::Blocks(block_vector) = good_result {
+                        let mut returned_hashes = HashSet::new();
                         for block_k in block_vector {
                             if let InventoryResponse::Available(actual_block) = block_k {
-                                if actual_block.hash() == Hash::from_str(hash_to_test).unwrap() {
-                                    println!(
-                                        "blocks with {:?} by hash good: {}",
-                                        peer_addr,
-                                        actual_block.hash()
-                                    );
-                                    return PollStatus::BlockRequestOK(peer_derived_data);
-                                }
+                                returned_hashes.insert(actual_block.hash());
                             }
                         }
+                        println!("{:?}", returned_hashes);
+                        let intersection_count = returned_hashes.intersection(&proband_hashes).count();
+                        println!("intersection_count is {:?}", intersection_count);
+                        if intersection_count == proband_hashes.len() {
+                            // All requested blocks are there and hash OK
+                            return PollStatus::BlockRequestOK(peer_derived_data);
+                        }
+                        // node returned a Blocks response, but it wasn't complete/correct for some reason
+                        return PollStatus::BlockRequestFail(peer_derived_data);
+                    } else {
+                        // connection established but we didn't get a Blocks response
+                        return PollStatus::BlockRequestFail(peer_derived_data);
                     }
-                    return PollStatus::BlockRequestFail(peer_derived_data); // it didn't hash so well
                 }
                 Err(error) => {
                     println!("blocks with {:?} by hash error: {}", peer_addr, error);
