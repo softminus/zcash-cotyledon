@@ -141,20 +141,8 @@ struct PeerDerivedData {
     _relay: bool,
 }
 
-async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
-    let hash_to_test = "000000000145f21eabd0024fbbb00384111644a5415b02bfe169b4fc300290e6";
-    println!("Starting new connection: peer addr is {:?}", peer_addr);
-    let the_connection = connect_isolated_tcp_direct(
-        Network::Mainnet,
-        peer_addr,
-        String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
-    );
-    let the_connection = timeout(Duration::from_secs(10), the_connection);
-    let x = the_connection.await;
-    let mut proband_hash_set = HashSet::new();
-    let proband_hash = <Hash>::from_hex(hash_to_test).expect("hex string failure");
-    proband_hash_set.insert(proband_hash);
 
+fn generate_proband_hashes() -> HashSet<Hash> {
     let checkpoint = CheckpointList::new(Network::Mainnet);
     let mut proband_heights = HashSet::new();
     let mut proband_hashes  = HashSet::new();
@@ -171,8 +159,8 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
             println!("height {:?} has hash {:?}",proband_height, hash);
         }
     }
-    
-    if let Ok(x) = x {
+    proband_hashes
+}
 
     match x {
         Ok(mut z) => {
