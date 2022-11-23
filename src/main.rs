@@ -1,4 +1,5 @@
 #![feature(ip)]
+#![feature(io_error_uncategorized)]
 use futures_util::{StreamExt, stream::FuturesUnordered};
 use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, ToSocketAddrs, IpAddr};
@@ -183,13 +184,14 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
         Ok(connection_might_have_failed) => {
             match connection_might_have_failed {
                 Err(connection_failure) => {
+                    println!("Connection with {:?} failed: {:?}", peer_addr, connection_failure);
                     if let Some(decanisterized_error) = connection_failure.downcast_ref::<std::io::Error>() {
-                        println!("succesfully decannisterized the error: {:?}", decanisterized_error);
+                        println!("IO error detected... decannisterizing: error = {:?}, test={:?}", decanisterized_error, decanisterized_error.kind() == std::io::ErrorKind::Uncategorized);
+                        // Connection with XXX.XXX.XXX.XXX:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
+                        if decanisterized_error.kind() == std::io::ErrorKind::Uncategorized { // probably an EMFILES / ENFILES
+                            return PollStatus::RetryConnection();
+                        }
                     }
-                    
-
-                    // Connection with 195.3.223.16:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
-                    println!("Connection with {:?} failed: {:?}: {:?}", peer_addr, connection_failure, connection_failure.source());
                     PollStatus::ConnectionFail() // need to special-case this for ETOOMANYOPENFILES
                 }
                 Ok(mut good_connection) => {
