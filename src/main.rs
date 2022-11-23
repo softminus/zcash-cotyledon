@@ -183,8 +183,13 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
         Ok(connection_might_have_failed) => {
             match connection_might_have_failed {
                 Err(connection_failure) => {
-//                    Connection with 195.3.223.16:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
-                    println!("Connection with {:?} failed: {:?}", peer_addr, connection_failure);
+                    if let Some(decanisterized_error) = connection_failure.downcast_ref::<std::io::Error>() {
+                        println!("succesfully decannisterized the error: {:?}", decanisterized_error);
+                    }
+                    
+
+                    // Connection with 195.3.223.16:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
+                    println!("Connection with {:?} failed: {:?}: {:?}", peer_addr, connection_failure, connection_failure.source());
                     PollStatus::ConnectionFail() // need to special-case this for ETOOMANYOPENFILES
                 }
                 Ok(mut good_connection) => {
