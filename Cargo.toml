@@ -39,6 +39,7 @@ zebra-consensus = {path= "/Users/sasha_work/repos/zebra/zebra-consensus"}
 tonic = "0.7"
 prost = "0.10"
 async-trait = "0.1.58"
+rlimit = "0.8.3"
 
 [build-dependencies]
 tonic-build = "0.7"
