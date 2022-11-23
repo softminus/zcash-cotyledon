@@ -167,91 +167,97 @@ fn generate_proband_hashes() -> HashSet<Hash> {
 // , tcp_timeout: Duration, protocol_timeout: Duration
 
 async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
+    let hash_to_test = "000000000145f21eabd0024fbbb00384111644a5415b02bfe169b4fc300290e6";
     println!("Starting new connection: peer addr is {:?}", peer_addr);
-    let socket = tokio::net::TcpStream::connect(peer_addr);
-    let socket = timeout(Duration::from_secs(1), socket).await;
-    match socket {
-        Err(tcp_timeout_error) => {
-            // we got a timeout during tcp connection
-            println!("timeout tcp connection {:?}", tcp_timeout_error);
-            PollStatus::ConnectionFail()
-        },
-        Ok(tcp_didnt_time_out) => {
-            // it didn't timeout, but it might have failed
-            match tcp_didnt_time_out {
-                Err(tcp_socket_error) => {
-                    println!("TCP Connection with {:?} failed: {:?}", peer_addr, tcp_socket_error);
-                    PollStatus::ConnectionFail()
-                }, // failed connect
-                Ok(tcp_socket) => {
-                    let zcash_connection = connect_isolated(Network::Mainnet, tcp_socket, String::from("/Seeder-and-feeder:0.0.0-alpha0/"));
-                    let zcash_connection = timeout(Duration::from_secs(1), zcash_connection).await;
-                    match zcash_connection {
-                        Err(negotiation_timeout) => {
-                            println!("protocol negotiation timeout with peer {:?}: {:?}", peer_addr, negotiation_timeout);
-                            PollStatus::ConnectionFail()
-                        },
-                        Ok(zcash_didnt_time_out) => {
-                            match zcash_didnt_time_out {
-                                Err(protocol_negotiation_failure) => {
-                                    println!("protocol negotiation failure with peer {:?}: {:?}", peer_addr, protocol_negotiation_failure);
-                                    PollStatus::ConnectionFail()
-                                }
-                                Ok(mut zcash_connection_established) => {
-                                    let numeric_version = zcash_connection_established.connection_info.remote.version;
-                                    let peer_services = zcash_connection_established.connection_info.remote.services;
-                                    let peer_height = zcash_connection_established.connection_info.remote.start_height;
-                                    let _user_agent = zcash_connection_established.connection_info.remote.user_agent.clone();
-                                    let _relay = zcash_connection_established.connection_info.remote.relay;
-                                    let peer_derived_data = PeerDerivedData {
-                                        numeric_version,
-                                        peer_services,
-                                        peer_height,
-                                        _user_agent,
-                                        _relay,
-                                    };
-                                    let proband_hashes = generate_proband_hashes();
-                                    let hash_query_response = zcash_connection_established.call(Request::BlocksByHash(proband_hashes.clone())).await;
-                                    //println!("hash query response is {:?}", hash_query_response);
-                                    match hash_query_response {
-                                        Err(protocol_error) => {
-                                            println!("protocol failure after requesting blocks by hash with peer {}: {:?}", peer_addr, protocol_error);
-                                            return PollStatus::BlockRequestFail(peer_derived_data);
-                                        },
-                                        Ok(hash_query_protocol_response) => {
-                                            match hash_query_protocol_response {
-                                                Response::Blocks(block_vector) => {
-                                                    let mut returned_hashes = HashSet::new();
-                                                    for block_k in block_vector {
-                                                        if let InventoryResponse::Available(actual_block) = block_k {
-                                                            returned_hashes.insert(actual_block.hash());
-                                                        }
-                                                    }
-                                                    println!("{:?}", returned_hashes);
-                                                    let intersection_count = returned_hashes.intersection(&proband_hashes).count();
-                                                    println!("intersection_count is {:?}", intersection_count);
-                                                    if intersection_count == proband_hashes.len() {
-                                                        // All requested blocks are there and hash OK
-                                                        return PollStatus::BlockRequestOK(peer_derived_data);
-                                                    }
-                                                    // node returned a Blocks response, but it wasn't complete/correct for some reason
-                                                    return PollStatus::BlockRequestFail(peer_derived_data);
-                                                }, // Response::Blocks(block_vector)
-                                                _ => {
-                                                    // connection established but we didn't get a Blocks response
-                                                    return PollStatus::BlockRequestFail(peer_derived_data);
-                                                }
-                                            } // match hash_query_protocol_response
-                                        } // Ok(hash_query_protocol_response)
-                                    } // match hash_query_response
-                                } // Ok(zcash_connection_established) 
-                            } // match zcash_didnt_time_out
-                        } // Ok(zcash_didnt_time_out)
-                    } // match zcash_connection
-                } // Ok(tcp_socket)
-            } // match tcp_didnt_time_out
-        } // Ok(tcp_didnt_time_out)
-    } // match socket
+    let the_connection = connect_isolated_tcp_direct(
+        Network::Mainnet,
+        peer_addr,
+        String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
+    );
+    let the_connection = timeout(Duration::from_secs(10), the_connection);
+    let x = the_connection.await;
+    let mut proband_hash_set = HashSet::new();
+    let proband_hash = <Hash>::from_hex(hash_to_test).expect("hex string failure");
+    proband_hash_set.insert(proband_hash);
+
+    let checkpoint = CheckpointList::new(Network::Mainnet);
+    let mut proband_heights = HashSet::new();
+    let mut proband_hashes  = HashSet::new();
+    for offset in (0..3200).rev() {
+        if let Some(ht) = checkpoint.min_height_in_range((checkpoint.max_height()-offset).unwrap()..) {
+            proband_heights.insert(ht);
+        }
+    }
+    let mut proband_heights_vec = Vec::from_iter(proband_heights);
+    proband_heights_vec.sort();
+    for proband_height in proband_heights_vec.iter().rev().take(2) {
+        if let Some(hash) = checkpoint.hash(*proband_height) {
+            proband_hashes.insert(hash);
+            println!("height {:?} has hash {:?}",proband_height, hash);
+        }
+    }
+    
+    if let Ok(x) = x {
+
+    match x {
+        Ok(mut z) => {
+            let numeric_version = z.connection_info.remote.version;
+            let peer_services = z.connection_info.remote.services;
+            let peer_height = z.connection_info.remote.start_height;
+            let _user_agent = z.connection_info.remote.user_agent.clone();
+            let _relay = z.connection_info.remote.relay;
+            let peer_derived_data = PeerDerivedData {
+                numeric_version,
+                peer_services,
+                peer_height,
+                _user_agent,
+                _relay,
+            };
+            // println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
+            // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
+            // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
+
+            let resp = z.call(Request::BlocksByHash(proband_hashes.clone())).await;
+            println!("hash query response is {:?}", resp);
+            match resp {
+                Ok(good_result) => {
+                    if let Response::Blocks(block_vector) = good_result {
+                        let mut returned_hashes = HashSet::new();
+                        for block_k in block_vector {
+                            if let InventoryResponse::Available(actual_block) = block_k {
+                                returned_hashes.insert(actual_block.hash());
+                            }
+                        }
+                        println!("{:?}", returned_hashes);
+                        let intersection_count = returned_hashes.intersection(&proband_hashes).count();
+                        println!("intersection_count is {:?}", intersection_count);
+                        if intersection_count == proband_hashes.len() {
+                            // All requested blocks are there and hash OK
+                            return PollStatus::BlockRequestOK(peer_derived_data);
+                        }
+                        // node returned a Blocks response, but it wasn't complete/correct for some reason
+                        return PollStatus::BlockRequestFail(peer_derived_data);
+                    } else {
+                        // connection established but we didn't get a Blocks response
+                        return PollStatus::BlockRequestFail(peer_derived_data);
+                    }
+                }
+                Err(error) => {
+                    println!("blocks with {:?} by hash error: {}", peer_addr, error);
+                    return PollStatus::BlockRequestFail(peer_derived_data);
+                }
+            }
+        } // ok connect
+        Err(error) => {
+            println!("Connection with {:?} failed: {:?}", peer_addr, error);
+            return PollStatus::ConnectionFail();
+        } // failed connect
+    };
+} else {
+        println!("Probe connection with {:?} TIMED OUT: {:?}", peer_addr, x);
+
+ PollStatus::ConnectionFail()
+}
 }
 
 async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>> {
