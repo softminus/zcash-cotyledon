@@ -128,9 +128,10 @@ impl DnsContext {
 }
 #[derive(Debug, Clone)]
 enum PollStatus {
-    ConnectionFail(),
-    BlockRequestFail(PeerDerivedData),
-    BlockRequestOK(PeerDerivedData),
+    RetryConnection(), // our fault
+    ConnectionFail(),  // their fault
+    BlockRequestFail(PeerDerivedData), // their fault
+    BlockRequestOK(PeerDerivedData),   // good
 }
 #[derive(Debug, Clone)]
 struct PeerDerivedData {
@@ -607,6 +608,9 @@ async fn probe_and_update(
     //println!("result = {:?}", poll_res);
     new_peer_stats.total_attempts += 1;
     match poll_res {
+        PollStatus::RetryConnection() => {
+            println!("Retry the connection!");
+        }
         PollStatus::BlockRequestOK(new_peer_data) => {
             new_peer_stats.total_successes += 1;
             new_peer_stats.peer_derived_data = Some(new_peer_data);
