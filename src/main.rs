@@ -528,7 +528,7 @@ async fn main() {
     }
     let max_inflight_conn = match getrlimit(Resource::NOFILE) {
         Ok((softlimit, _hardlimit)) => 102400, //softlimit.min(4096), // limit at 4096 to avoid ridiculous network loads
-        _ => 256,                                           // otherwise play it really safe
+        _ => 256,                              // otherwise play it really safe
     };
 
     let network = Network::Mainnet;
@@ -567,13 +567,32 @@ async fn main() {
         println!("starting Loop");
         match mode {
             CrawlingMode::FastAcquisition => {
-                let timeouts = Timeouts {peers_timeout: Duration::from_secs(4), hash_timeout:  Duration::from_secs(4)};
-                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, timeouts).await;
+                let timeouts = Timeouts {
+                    peers_timeout: Duration::from_secs(4),
+                    hash_timeout: Duration::from_secs(4),
+                };
+                fast_walker(
+                    &serving_nodes_shared,
+                    &mut internal_peer_tracker,
+                    network,
+                    timeouts,
+                )
+                .await;
                 mode = CrawlingMode::LongTermUpdates;
             }
             CrawlingMode::LongTermUpdates => {
-                let timeouts = Timeouts {peers_timeout: Duration::from_secs(16), hash_timeout:  Duration::from_secs(16)};
-                slow_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, max_inflight_conn.try_into().unwrap(), timeouts).await;
+                let timeouts = Timeouts {
+                    peers_timeout: Duration::from_secs(16),
+                    hash_timeout: Duration::from_secs(16),
+                };
+                slow_walker(
+                    &serving_nodes_shared,
+                    &mut internal_peer_tracker,
+                    network,
+                    max_inflight_conn.try_into().unwrap(),
+                    timeouts,
+                )
+                .await;
             }
         }
         // just in case...we could add code to check if this does anything to find bugs with the incremental update
@@ -646,13 +665,13 @@ fn single_node_update(
 
 struct Timeouts {
     hash_timeout: Duration,
-    peers_timeout: Duration
+    peers_timeout: Duration,
 }
 async fn probe_and_update(
     proband_address: SocketAddr,
     old_stats: Option<PeerStats>,
     network: Network,
-    timeouts: &Timeouts
+    timeouts: &Timeouts,
 ) -> (SocketAddr, Option<(PeerStats, Vec<SocketAddr>)>) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
@@ -724,10 +743,16 @@ async fn slow_walker(
     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
     network: Network,
     max_inflight_conn: usize,
-    timeouts: Timeouts) {
+    timeouts: Timeouts,
+) {
     let mut batch_queries = Vec::new();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone(), network, &timeouts));
+        batch_queries.push(probe_and_update(
+            proband_address.clone(),
+            peer_stat.clone(),
+            network,
+            &timeouts,
+        ));
     }
 
     let mut stream = futures::stream::iter(batch_queries).buffer_unordered(max_inflight_conn);
@@ -756,7 +781,7 @@ async fn fast_walker(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
     network: Network,
-    timeouts: Timeouts
+    timeouts: Timeouts,
 ) {
     let mut handles = FuturesUnordered::new();
 
