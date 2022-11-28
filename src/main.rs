@@ -17,6 +17,7 @@ use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
 use trust_dns_server::{authority::MessageResponseBuilder, client::rr as dnsrr, proto::op as dnsop, server as dns};
 use tokio::net::UdpSocket;
 use tokio::time::timeout;
+use rlimit::{getrlimit, increase_nofile_limit, Resource};
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedReply, SeedRequest};
 use zebra_network::types::MetaAddr;
@@ -497,6 +498,15 @@ enum CrawlingMode {
 
 #[tokio::main]
 async fn main() {
+    if let Ok((_softlimit, hardlimit)) = getrlimit(Resource::NOFILE)
+    {
+        increase_nofile_limit(256); // hardlimit);
+    }
+    let max_inflight_conn = match getrlimit(Resource::NOFILE) {
+        Ok((softlimit, _hardlimit)) => softlimit.min(4096), // limit at 4096 to avoid ridiculous network loads
+        _ => 256                                            // otherwise play it really safe
+    };
+
     let serving_nodes: ServingNodes = Default::default();
     let serving_nodes_shared = Arc::new(RwLock::new(serving_nodes));
 
