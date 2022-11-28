@@ -167,14 +167,14 @@ fn generate_proband_hashes() -> HashSet<Hash> {
 
 // , tcp_timeout: Duration, protocol_timeout: Duration
 
-async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
+async fn test_a_server(peer_addr: SocketAddr, network: Network, connection_timeout: Duration) -> PollStatus {
     println!("Starting new connection: peer addr is {:?}", peer_addr);
     let connection = connect_isolated_tcp_direct(
-        Network::Mainnet,
+        network,
         peer_addr,
         String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
     );
-    let connection = timeout(Duration::from_secs(10), connection);
+    let connection = timeout(connection_timeout, connection);
     let connection = connection.await;
 
     match connection {
@@ -256,14 +256,14 @@ async fn test_a_server(peer_addr: SocketAddr) -> PollStatus {
 
 
 
-async fn probe_for_peers(peer_addr: SocketAddr) -> Option<Vec<MetaAddr>> {
+async fn probe_for_peers(peer_addr: SocketAddr, network: Network, connection_timeout: Duration) -> Option<Vec<MetaAddr>> {
     println!("Starting new connection: peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(
-        Network::Mainnet,
+        network,
         peer_addr,
         String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
     );
-    let the_connection = timeout(Duration::from_secs(3), the_connection);
+    let the_connection = timeout(connection_timeout, the_connection);
     let x = the_connection.await;
     if let Ok(x) = x {
 
@@ -506,7 +506,7 @@ async fn main() {
         Ok((softlimit, _hardlimit)) => softlimit.min(4096), // limit at 4096 to avoid ridiculous network loads
         _ => 256                                            // otherwise play it really safe
     };
-
+    let network = Network::Mainnet;
     let serving_nodes: ServingNodes = Default::default();
     let serving_nodes_shared = Arc::new(RwLock::new(serving_nodes));
 
@@ -542,7 +542,7 @@ async fn main() {
         println!("starting Loop");
         match mode {
             CrawlingMode::FastAcquisition => {
-                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker).await;
+                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker, network).await;
                 mode = CrawlingMode::LongTermUpdates;
             },
             CrawlingMode::LongTermUpdates => {
@@ -624,6 +624,7 @@ fn single_node_update(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
 async fn probe_and_update(
     proband_address: SocketAddr,
     old_stats: Option<PeerStats>,
+    network: Network
 ) -> (SocketAddr, Option<(PeerStats, Vec<SocketAddr>)>) { // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
         None => PeerStats {
@@ -638,8 +639,8 @@ async fn probe_and_update(
     };
     let mut found_peer_addresses = Vec::new();
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
-    let poll_res = test_a_server(proband_address).await;
-    let peers_res = probe_for_peers(proband_address).await;
+    let poll_res = test_a_server(proband_address, network,    Duration::from_secs(5)).await;
+    let peers_res = probe_for_peers(proband_address, network, Duration::from_secs(5)).await;
     if let Some(peer_list) = peers_res {
         for peer in peer_list {
             found_peer_addresses.push(peer.addr());
@@ -718,10 +719,11 @@ async fn probe_and_update(
 
 
 async fn fast_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
-    internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>) {
+    internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
+    network: Network) {
     let mut handles = FuturesUnordered::new();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        handles.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
+        handles.push(probe_and_update(proband_address.clone(), peer_stat.clone(), network));
     }
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
@@ -735,13 +737,13 @@ async fn fast_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
                 let key = peer.to_socket_addrs().unwrap().next().unwrap();
                 if !internal_peer_tracker.contains_key(&key) {
                     internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                    handles.push(probe_and_update(key.clone(), <Option<PeerStats>>::None));
+                    handles.push(probe_and_update(key.clone(), <Option<PeerStats>>::None, network));
                 }
             }
             println!("HashMap len: {:?}", internal_peer_tracker.len());
         } else { // we gotta retry
-            println!("WE GOTTA RETRY {:?}", peer_address);
-            handles.push(probe_and_update(peer_address.clone(), internal_peer_tracker[&peer_address].clone()))
+            println!("RETRYING {:?}", peer_address);
+            handles.push(probe_and_update(peer_address.clone(), internal_peer_tracker[&peer_address].clone(), network))
         }
     }
 }
