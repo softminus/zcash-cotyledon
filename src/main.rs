@@ -267,31 +267,30 @@ async fn probe_for_peers(peer_addr: SocketAddr, network: Network, connection_tim
     let x = the_connection.await;
     if let Ok(x) = x {
 
-    match x {
-        Ok(mut z) => {
-            let mut peers_vec: Option<Vec<MetaAddr>> = None;
-            for _attempt in 0..2 {
-                let resp = z.call(Request::Peers).await;
-                if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = resp {
-                    if candidate_peers.len() > 1 {
-                        peers_vec = Some(candidate_peers.to_vec());
-                        //println!("{:?}", peers_vec);
-                        break;
+        match x {
+            Ok(mut z) => {
+                let mut peers_vec: Option<Vec<MetaAddr>> = None;
+                for _attempt in 0..2 {
+                    let resp = z.call(Request::Peers).await;
+                    if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = resp {
+                        if candidate_peers.len() > 1 {
+                            peers_vec = Some(candidate_peers.to_vec());
+                            //println!("{:?}", peers_vec);
+                            break;
+                        }
                     }
                 }
+                return peers_vec;
+            } // ok connect
+            Err(error) => {
+                println!("Peers connection with {:?} failed: {:?}", peer_addr, error);
+                return None;
             }
-            return peers_vec;
-        } // ok connect
-        Err(error) => {
-            println!("Peers connection with {:?} failed: {:?}", peer_addr, error);
-            return None;
-        }
-    };
-} else {
+        };
+    } else {
         println!("Peers connection with {:?} TIMED OUT: {:?}", peer_addr, x);
         None
-
-}
+    }
 }
 
 //Connection with 74.208.91.217:8233 failed: Serialization(Parse("getblocks version did not match negotiation"))
