@@ -1,10 +1,11 @@
 #![feature(ip)]
 #![feature(io_error_uncategorized)]
+#![feature(once_cell)]
 use futures_util::{StreamExt, stream::FuturesUnordered};
 use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, ToSocketAddrs, IpAddr};
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, LazyLock};
 use std::time::{Duration, SystemTime};
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
@@ -144,7 +145,7 @@ struct PeerDerivedData {
 }
 
 
-fn generate_proband_hashes() -> HashSet<Hash> {
+static HASH_CHECKPOINTS: LazyLock<HashSet<Hash>> = LazyLock::new( || {
     let checkpoint = CheckpointList::new(Network::Mainnet);
     let mut proband_heights = HashSet::new();
     let mut proband_hashes  = HashSet::new();
@@ -162,7 +163,7 @@ fn generate_proband_hashes() -> HashSet<Hash> {
         }
     }
     proband_hashes
-}
+});
 
 
 // , tcp_timeout: Duration, protocol_timeout: Duration
@@ -212,8 +213,7 @@ async fn test_a_server(peer_addr: SocketAddr, network: Network, connection_timeo
                     // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
                     // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
 
-                    let proband_hashes = generate_proband_hashes();
-                    let hash_query_response = good_connection.call(Request::BlocksByHash(proband_hashes.clone())).await;
+                    let hash_query_response = good_connection.call(Request::BlocksByHash(HASH_CHECKPOINTS.clone())).await;
                     //println!("hash query response is {:?}", hash_query_response);
                     match hash_query_response {
                         Err(protocol_error) => {
@@ -230,9 +230,9 @@ async fn test_a_server(peer_addr: SocketAddr, network: Network, connection_timeo
                                         }
                                     }
                                     println!("{:?}", returned_hashes);
-                                    let intersection_count = returned_hashes.intersection(&proband_hashes).count();
+                                    let intersection_count = returned_hashes.intersection(&HASH_CHECKPOINTS).count();
                                     println!("intersection_count is {:?}", intersection_count);
-                                    if intersection_count == proband_hashes.len() {
+                                    if intersection_count == HASH_CHECKPOINTS.len() {
                                         // All requested blocks are there and hash OK
                                         return PollStatus::BlockRequestOK(peer_derived_data);
                                     }
@@ -505,6 +505,10 @@ async fn main() {
         Ok((softlimit, _hardlimit)) => softlimit.min(4096), // limit at 4096 to avoid ridiculous network loads
         _ => 256                                            // otherwise play it really safe
     };
+
+    println!("CHECKPOINTS {:?}", HASH_CHECKPOINTS.len());
+    return ();
+
     let network = Network::Mainnet;
     let serving_nodes: ServingNodes = Default::default();
     let serving_nodes_shared = Arc::new(RwLock::new(serving_nodes));
