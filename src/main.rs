@@ -527,7 +527,7 @@ async fn main() {
         increase_nofile_limit(256); // hardlimit);
     }
     let max_inflight_conn = match getrlimit(Resource::NOFILE) {
-        Ok((softlimit, _hardlimit)) => softlimit.min(4096), // limit at 4096 to avoid ridiculous network loads
+        Ok((softlimit, _hardlimit)) => 102400, //softlimit.min(4096), // limit at 4096 to avoid ridiculous network loads
         _ => 256,                                           // otherwise play it really safe
     };
 
@@ -561,7 +561,7 @@ async fn main() {
         let value = None;
         internal_peer_tracker.insert(key, value);
     }
-    let mut mode = CrawlingMode::FastAcquisition;
+    let mut mode = CrawlingMode::LongTermUpdates;
 
     loop {
         println!("starting Loop");
@@ -571,8 +571,7 @@ async fn main() {
                 mode = CrawlingMode::LongTermUpdates;
             }
             CrawlingMode::LongTermUpdates => {
-                return ();
-                //slow_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, max_inflight_conn).await;
+                slow_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, max_inflight_conn.try_into().unwrap()).await;
             }
         }
         // just in case...we could add code to check if this does anything to find bugs with the incremental update
@@ -713,31 +712,37 @@ async fn probe_and_update(
     );
 }
 
-// async fn slow_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
-//     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>) {
-//     let mut batch_queries = Vec::new();
-//     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-//         batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone()));
-//     }
+async fn slow_walker(
+    serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+    internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
+    network: Network,
+    max_inflight_conn: usize) {
+    let mut batch_queries = Vec::new();
+    for (proband_address, peer_stat) in internal_peer_tracker.iter() {
+        batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone(), network));
+    }
 
-//     let mut stream = futures::stream::iter(batch_queries).buffer_unordered(8192);
-//     while let Some(probe_result) = stream.next().await {
-//         //println!("probe_result {:?}", probe_result);
-//         let new_peer_stat = probe_result.0.clone();
-//         let peer_address = probe_result.1;
-//         let new_peers = probe_result.2;
-//         println!("RESULT {} {:?}", peer_address, new_peer_stat);
-//         internal_peer_tracker.insert(peer_address.clone(), new_peer_stat.clone());
-//         single_node_update(&serving_nodes_shared, &peer_address, &new_peer_stat);
-//         for peer in new_peers {
-//             let key = peer.to_socket_addrs().unwrap().next().unwrap();
-//             if !internal_peer_tracker.contains_key(&key) {
-//                 internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-//             }
-//         }
-//         println!("HashMap len: {:?}", internal_peer_tracker.len());
-//     }
-// }
+    let mut stream = futures::stream::iter(batch_queries).buffer_unordered(max_inflight_conn);
+    while let Some(probe_result) = stream.next().await {
+        let peer_address = probe_result.0;
+        if let Some((new_peer_stat, new_peers)) = probe_result.1 {
+            println!("new peer stat: {:?}", new_peer_stat);
+            println!("new peers: {:?}", new_peers);
+            let new_peer_stat = new_peer_stat.clone();
+            internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
+            single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
+            for peer in new_peers {
+                let key = peer.to_socket_addrs().unwrap().next().unwrap();
+                if !internal_peer_tracker.contains_key(&key) {
+                    internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+                }
+            }
+            println!("HashMap len: {:?}", internal_peer_tracker.len());
+        } else {
+            print!("SLOW WALKER MUST RETRY {:?} NEXT TIME AROUND", peer_address);
+        }
+    }
+}
 
 async fn fast_walker(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
