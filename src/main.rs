@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock, RwLock};
+use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
@@ -427,18 +428,23 @@ fn update_ewma_pack(
 
 
 
-fn poll_this_time_around(peer_stats: &PeerStats) -> bool {
-    match peer_stats.last_polled {
+fn poll_this_time_around(peer_stats: &Option<PeerStats>) -> bool {
+    match peer_stats {
         None => {true},
-        Some(previous_polling_time) => {
-            if let Ok(duration) = SystemTime::now().duration_since(previous_polling_time) {
-                if duration > Duration::from_secs(100) {
-                    return true
-                } else {
-                    return false;
+        Some(peer_stats) => {
+            match peer_stats.last_polled {
+                None => {true},
+                Some(previous_polling_time) => {
+                    if let Ok(duration) = SystemTime::now().duration_since(previous_polling_time) {
+                        if duration > Duration::from_secs(100) {
+                            return true
+                        } else {
+                            return false;
+                        }
+                    } else {
+                        return true;
+                    }
                 }
-            } else {
-                return true;
             }
         }
     }
@@ -582,7 +588,7 @@ async fn main() {
         let value = None;
         internal_peer_tracker.insert(key, value);
     }
-    let mut mode = CrawlingMode::FastAcquisition;
+    let mut mode = CrawlingMode::LongTermUpdates;
 
     loop {
         println!("starting Loop");
@@ -618,7 +624,7 @@ async fn main() {
         }
         // just in case...we could add code to check if this does anything to find bugs with the incremental update
         update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
-
+        sleep(Duration::new(4, 0));
         println!("done with getting results");
     }
 }
@@ -768,12 +774,16 @@ async fn slow_walker(
 ) {
     let mut batch_queries = Vec::new();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        batch_queries.push(probe_and_update(
-            proband_address.clone(),
-            peer_stat.clone(),
-            network,
-            &timeouts,
-        ));
+        if poll_this_time_around(peer_stat) {
+            batch_queries.push(probe_and_update(
+                proband_address.clone(),
+                peer_stat.clone(),
+                network,
+                &timeouts,
+            ));
+        } else {
+            println!("NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY", proband_address);
+        }
     }
 
     let mut stream = futures::stream::iter(batch_queries).buffer_unordered(max_inflight_conn);
@@ -785,12 +795,12 @@ async fn slow_walker(
             let new_peer_stat = new_peer_stat.clone();
             internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
             single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
-            for peer in new_peers {
-                let key = peer.to_socket_addrs().unwrap().next().unwrap();
-                if !internal_peer_tracker.contains_key(&key) {
-                    internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                }
-            }
+            // for peer in new_peers {
+            //     let key = peer.to_socket_addrs().unwrap().next().unwrap();
+            //     if !internal_peer_tracker.contains_key(&key) {
+            //         internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+            //     }
+            // }
             println!("HashMap len: {:?}", internal_peer_tracker.len());
         } else {
             print!("SLOW WALKER MUST RETRY {:?} NEXT TIME AROUND", peer_address);
