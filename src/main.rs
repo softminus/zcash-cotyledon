@@ -18,6 +18,7 @@ use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
 use trust_dns_server::{authority::MessageResponseBuilder, client::rr as dnsrr, proto::op as dnsop, server as dns};
 use tokio::net::UdpSocket;
 use tokio::time::timeout;
+use tokio::sync::Semaphore;
 use rlimit::{getrlimit, increase_nofile_limit, Resource};
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedReply, SeedRequest};
@@ -506,9 +507,6 @@ async fn main() {
         _ => 256                                            // otherwise play it really safe
     };
 
-    println!("CHECKPOINTS {:?}", HASH_CHECKPOINTS.len());
-    return ();
-
     let network = Network::Mainnet;
     let serving_nodes: ServingNodes = Default::default();
     let serving_nodes_shared = Arc::new(RwLock::new(serving_nodes));
@@ -545,7 +543,7 @@ async fn main() {
         println!("starting Loop");
         match mode {
             CrawlingMode::FastAcquisition => {
-                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker, network).await;
+                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, max_inflight_conn).await;
                 mode = CrawlingMode::LongTermUpdates;
             },
             CrawlingMode::LongTermUpdates => {
@@ -723,8 +721,11 @@ async fn probe_and_update(
 
 async fn fast_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
-    network: Network) {
+    network: Network,
+    max_inflight_conn: u64) {
     let mut handles = FuturesUnordered::new();
+    let semaphore = Semaphore::new(max_inflight_conn.try_into().unwrap());
+
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
         handles.push(probe_and_update(proband_address.clone(), peer_stat.clone(), network));
     }
