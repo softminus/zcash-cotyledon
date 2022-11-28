@@ -567,11 +567,13 @@ async fn main() {
         println!("starting Loop");
         match mode {
             CrawlingMode::FastAcquisition => {
-                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker, network).await;
+                let timeouts = Timeouts {peers_timeout: Duration::from_secs(4), hash_timeout:  Duration::from_secs(4)};
+                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, timeouts).await;
                 mode = CrawlingMode::LongTermUpdates;
             }
             CrawlingMode::LongTermUpdates => {
-                slow_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, max_inflight_conn.try_into().unwrap()).await;
+                let timeouts = Timeouts {peers_timeout: Duration::from_secs(16), hash_timeout:  Duration::from_secs(16)};
+                slow_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, max_inflight_conn.try_into().unwrap(), timeouts).await;
             }
         }
         // just in case...we could add code to check if this does anything to find bugs with the incremental update
@@ -642,10 +644,15 @@ fn single_node_update(
     *unlocked = new_nodes.clone();
 }
 
+struct Timeouts {
+    hash_timeout: Duration,
+    peers_timeout: Duration
+}
 async fn probe_and_update(
     proband_address: SocketAddr,
     old_stats: Option<PeerStats>,
     network: Network,
+    timeouts: &Timeouts
 ) -> (SocketAddr, Option<(PeerStats, Vec<SocketAddr>)>) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
@@ -661,8 +668,8 @@ async fn probe_and_update(
     };
     let mut found_peer_addresses = Vec::new();
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
-    let poll_res = test_a_server(proband_address, network, Duration::from_secs(5)).await;
-    let peers_res = probe_for_peers(proband_address, network, Duration::from_secs(5)).await;
+    let poll_res = test_a_server(proband_address, network, timeouts.hash_timeout).await;
+    let peers_res = probe_for_peers(proband_address, network, timeouts.peers_timeout).await;
     if let Some(peer_list) = peers_res {
         for peer in peer_list {
             found_peer_addresses.push(peer.addr());
@@ -716,10 +723,11 @@ async fn slow_walker(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
     network: Network,
-    max_inflight_conn: usize) {
+    max_inflight_conn: usize,
+    timeouts: Timeouts) {
     let mut batch_queries = Vec::new();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone(), network));
+        batch_queries.push(probe_and_update(proband_address.clone(), peer_stat.clone(), network, &timeouts));
     }
 
     let mut stream = futures::stream::iter(batch_queries).buffer_unordered(max_inflight_conn);
@@ -748,6 +756,7 @@ async fn fast_walker(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
     network: Network,
+    timeouts: Timeouts
 ) {
     let mut handles = FuturesUnordered::new();
 
@@ -756,6 +765,7 @@ async fn fast_walker(
             proband_address.clone(),
             peer_stat.clone(),
             network,
+            &timeouts,
         ));
     }
     while let Some(probe_result) = handles.next().await {
@@ -774,6 +784,7 @@ async fn fast_walker(
                         key.clone(),
                         <Option<PeerStats>>::None,
                         network,
+                        &timeouts,
                     ));
                 }
             }
@@ -785,6 +796,7 @@ async fn fast_walker(
                 peer_address.clone(),
                 internal_peer_tracker[&peer_address].clone(),
                 network,
+                &timeouts,
             ))
         }
     }
