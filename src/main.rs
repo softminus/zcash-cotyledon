@@ -501,6 +501,10 @@ async fn main() {
     {
         increase_nofile_limit(256); // hardlimit);
     }
+    let max_inflight_conn = match getrlimit(Resource::NOFILE) {
+        Ok((softlimit, _hardlimit)) => softlimit.min(4096), // limit at 4096 to avoid ridiculous network loads
+        _ => 256                                            // otherwise play it really safe
+    };
 
     let network = Network::Mainnet;
     let serving_nodes: ServingNodes = Default::default();
@@ -538,12 +542,12 @@ async fn main() {
         println!("starting Loop");
         match mode {
             CrawlingMode::FastAcquisition => {
-                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, max_inflight_conn).await;
+                fast_walker(&serving_nodes_shared, &mut internal_peer_tracker, network).await;
                 mode = CrawlingMode::LongTermUpdates;
             },
             CrawlingMode::LongTermUpdates => {
                 return ();
-                //slow_walker(&serving_nodes_shared, &mut internal_peer_tracker).await;
+                //slow_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, max_inflight_conn).await;
             }
         }
         // just in case...we could add code to check if this does anything to find bugs with the incremental update
