@@ -425,6 +425,27 @@ fn update_ewma_pack(
     update_ewma(&mut prev.stat_1month, sample_age, sample);
 }
 
+
+
+fn poll_this_time_around(peer_stats: &PeerStats) -> bool {
+    match peer_stats.last_polled {
+        None => {true},
+        Some(previous_polling_time) => {
+            if let Ok(duration) = SystemTime::now().duration_since(previous_polling_time) {
+                if duration > Duration::from_secs(100) {
+                    return true
+                } else {
+                    return false;
+                }
+            } else {
+                return true;
+            }
+        }
+    }
+}
+
+
+
 fn get_classification(
     peer_stats: &Option<PeerStats>,
     peer_address: &SocketAddr,
@@ -561,7 +582,7 @@ async fn main() {
         let value = None;
         internal_peer_tracker.insert(key, value);
     }
-    let mut mode = CrawlingMode::LongTermUpdates;
+    let mut mode = CrawlingMode::FastAcquisition;
 
     loop {
         println!("starting Loop");
