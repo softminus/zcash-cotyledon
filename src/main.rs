@@ -1,11 +1,12 @@
 #![feature(ip)]
 #![feature(io_error_uncategorized)]
 #![feature(once_cell)]
-use futures_util::{StreamExt, stream::FuturesUnordered};
+use futures_util::stream::FuturesUnordered;
+use futures_util::StreamExt;
 use std::collections::{HashMap, HashSet};
-use std::net::{SocketAddr, ToSocketAddrs, IpAddr};
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
-use std::sync::{Arc, RwLock, LazyLock};
+use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, SystemTime};
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
@@ -13,16 +14,19 @@ use zebra_chain::parameters::Network;
 use zebra_network::types::PeerServices;
 use zebra_network::{connect_isolated_tcp_direct, InventoryResponse, Request, Response, Version};
 //use zebra_network::protocol::external::types::Version;
-use tonic::transport::Server;
-use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
-use trust_dns_server::{authority::MessageResponseBuilder, client::rr as dnsrr, proto::op as dnsop, server as dns};
-use tokio::net::UdpSocket;
-use tokio::time::timeout;
 use rlimit::{getrlimit, increase_nofile_limit, Resource};
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedReply, SeedRequest};
-use zebra_network::types::MetaAddr;
+use tokio::net::UdpSocket;
+use tokio::time::timeout;
+use tonic::transport::Server;
+use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
+use trust_dns_server::authority::MessageResponseBuilder;
+use trust_dns_server::client::rr as dnsrr;
+use trust_dns_server::proto::op as dnsop;
+use trust_dns_server::server as dns;
 use zebra_consensus::CheckpointList;
+use zebra_network::types::MetaAddr;
 pub mod seeder_proto {
     tonic::include_proto!("seeder"); // The string specified here must match the proto package name
 }
@@ -62,8 +66,6 @@ impl Seeder for SeedContext {
     }
 }
 
-
-
 #[derive(Clone, Debug)]
 pub struct DnsContext {
     serving_nodes_shared: Arc<RwLock<ServingNodes>>,
@@ -89,7 +91,6 @@ impl dns::RequestHandler for DnsContext {
     }
 }
 
-
 impl DnsContext {
     async fn do_handle_request<R: dns::ResponseHandler>(
         &self,
@@ -114,13 +115,21 @@ impl DnsContext {
         {
             let serving_nodes = self.serving_nodes_shared.read().unwrap();
 
-            for peer in serving_nodes.primaries.iter().chain(serving_nodes.alternates.iter()) {
+            for peer in serving_nodes
+                .primaries
+                .iter()
+                .chain(serving_nodes.alternates.iter())
+            {
                 if dns_servable(*peer, self.serving_network) {
                     let rdata = match peer.ip() {
                         IpAddr::V4(ipv4) => dnsrr::RData::A(ipv4),
                         IpAddr::V6(ipv6) => dnsrr::RData::AAAA(ipv6),
                     };
-                    records.push(dnsrr::Record::from_rdata(request.query().name().into(), 60, rdata))
+                    records.push(dnsrr::Record::from_rdata(
+                        request.query().name().into(),
+                        60,
+                        rdata,
+                    ))
                 }
             }
         }
@@ -130,8 +139,8 @@ impl DnsContext {
 }
 #[derive(Debug, Clone)]
 enum PollStatus {
-    RetryConnection(), // our fault
-    ConnectionFail(),  // their fault
+    RetryConnection(),                 // our fault
+    ConnectionFail(),                  // their fault
     BlockRequestFail(PeerDerivedData), // their fault
     BlockRequestOK(PeerDerivedData),   // good
 }
@@ -144,13 +153,14 @@ struct PeerDerivedData {
     _relay: bool,
 }
 
-
-static HASH_CHECKPOINTS: LazyLock<HashSet<Hash>> = LazyLock::new( || {
+static HASH_CHECKPOINTS: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     let checkpoint = CheckpointList::new(Network::Mainnet);
     let mut proband_heights = HashSet::new();
-    let mut proband_hashes  = HashSet::new();
+    let mut proband_hashes = HashSet::new();
     for offset in (0..3200).rev() {
-        if let Some(ht) = checkpoint.min_height_in_range((checkpoint.max_height()-offset).unwrap()..) {
+        if let Some(ht) =
+            checkpoint.min_height_in_range((checkpoint.max_height() - offset).unwrap()..)
+        {
             proband_heights.insert(ht);
         }
     }
@@ -159,16 +169,19 @@ static HASH_CHECKPOINTS: LazyLock<HashSet<Hash>> = LazyLock::new( || {
     for proband_height in proband_heights_vec.iter().rev().take(2) {
         if let Some(hash) = checkpoint.hash(*proband_height) {
             proband_hashes.insert(hash);
-            println!("height {:?} has hash {:?}",proband_height, hash);
+            println!("height {:?} has hash {:?}", proband_height, hash);
         }
     }
     proband_hashes
 });
 
-
 // , tcp_timeout: Duration, protocol_timeout: Duration
 
-async fn test_a_server(peer_addr: SocketAddr, network: Network, connection_timeout: Duration) -> PollStatus {
+async fn test_a_server(
+    peer_addr: SocketAddr,
+    network: Network,
+    connection_timeout: Duration,
+) -> PollStatus {
     println!("Starting new connection: peer addr is {:?}", peer_addr);
     let connection = connect_isolated_tcp_direct(
         network,
@@ -180,17 +193,30 @@ async fn test_a_server(peer_addr: SocketAddr, network: Network, connection_timeo
 
     match connection {
         Err(timeout_error) => {
-            println!("Probe connection with {:?} TIMED OUT: {:?}", peer_addr, timeout_error);
+            println!(
+                "Probe connection with {:?} TIMED OUT: {:?}",
+                peer_addr, timeout_error
+            );
             PollStatus::ConnectionFail()
-        },
+        }
         Ok(connection_might_have_failed) => {
             match connection_might_have_failed {
                 Err(connection_failure) => {
-                    println!("Connection with {:?} failed: {:?}", peer_addr, connection_failure);
-                    if let Some(decanisterized_error) = connection_failure.downcast_ref::<std::io::Error>() {
-                        println!("IO error detected... decannisterizing: error = {:?}, test={:?}", decanisterized_error, decanisterized_error.kind() == std::io::ErrorKind::Uncategorized);
+                    println!(
+                        "Connection with {:?} failed: {:?}",
+                        peer_addr, connection_failure
+                    );
+                    if let Some(decanisterized_error) =
+                        connection_failure.downcast_ref::<std::io::Error>()
+                    {
+                        println!(
+                            "IO error detected... decannisterizing: error = {:?}, test={:?}",
+                            decanisterized_error,
+                            decanisterized_error.kind() == std::io::ErrorKind::Uncategorized
+                        );
                         // Connection with XXX.XXX.XXX.XXX:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
-                        if decanisterized_error.kind() == std::io::ErrorKind::Uncategorized { // probably an EMFILES / ENFILES
+                        if decanisterized_error.kind() == std::io::ErrorKind::Uncategorized {
+                            // probably an EMFILES / ENFILES
                             return PollStatus::RetryConnection();
                         }
                     }
@@ -213,24 +239,28 @@ async fn test_a_server(peer_addr: SocketAddr, network: Network, connection_timeo
                     // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
                     // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
 
-                    let hash_query_response = good_connection.call(Request::BlocksByHash(HASH_CHECKPOINTS.clone())).await;
+                    let hash_query_response = good_connection
+                        .call(Request::BlocksByHash(HASH_CHECKPOINTS.clone()))
+                        .await;
                     //println!("hash query response is {:?}", hash_query_response);
                     match hash_query_response {
                         Err(protocol_error) => {
                             println!("protocol failure after requesting blocks by hash with peer {}: {:?}", peer_addr, protocol_error);
                             return PollStatus::BlockRequestFail(peer_derived_data);
-                        },
+                        }
                         Ok(hash_query_protocol_response) => {
                             match hash_query_protocol_response {
                                 Response::Blocks(block_vector) => {
                                     let mut returned_hashes = HashSet::new();
                                     for block_k in block_vector {
-                                        if let InventoryResponse::Available(actual_block) = block_k {
+                                        if let InventoryResponse::Available(actual_block) = block_k
+                                        {
                                             returned_hashes.insert(actual_block.hash());
                                         }
                                     }
                                     println!("{:?}", returned_hashes);
-                                    let intersection_count = returned_hashes.intersection(&HASH_CHECKPOINTS).count();
+                                    let intersection_count =
+                                        returned_hashes.intersection(&HASH_CHECKPOINTS).count();
                                     println!("intersection_count is {:?}", intersection_count);
                                     if intersection_count == HASH_CHECKPOINTS.len() {
                                         // All requested blocks are there and hash OK
@@ -238,7 +268,7 @@ async fn test_a_server(peer_addr: SocketAddr, network: Network, connection_timeo
                                     }
                                     // node returned a Blocks response, but it wasn't complete/correct for some reason
                                     PollStatus::BlockRequestFail(peer_derived_data)
-                                }, // Response::Blocks(block_vector)
+                                } // Response::Blocks(block_vector)
                                 _ => {
                                     // connection established but we didn't get a Blocks response
                                     PollStatus::BlockRequestFail(peer_derived_data)
@@ -252,11 +282,11 @@ async fn test_a_server(peer_addr: SocketAddr, network: Network, connection_timeo
     }
 }
 
-
-
-
-
-async fn probe_for_peers(peer_addr: SocketAddr, network: Network, connection_timeout: Duration) -> Option<Vec<MetaAddr>> {
+async fn probe_for_peers(
+    peer_addr: SocketAddr,
+    network: Network,
+    connection_timeout: Duration,
+) -> Option<Vec<MetaAddr>> {
     println!("Starting new connection: peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(
         network,
@@ -266,7 +296,6 @@ async fn probe_for_peers(peer_addr: SocketAddr, network: Network, connection_tim
     let the_connection = timeout(connection_timeout, the_connection);
     let x = the_connection.await;
     if let Ok(x) = x {
-
         match x {
             Ok(mut z) => {
                 let mut peers_vec: Option<Vec<MetaAddr>> = None;
@@ -325,7 +354,7 @@ struct PeerStats {
 
 #[derive(Debug, Clone, Default)]
 struct ServingNodes {
-    primaries:  HashSet<SocketAddr>,
+    primaries: HashSet<SocketAddr>,
     alternates: HashSet<SocketAddr>,
 }
 
@@ -374,14 +403,15 @@ fn update_ewma(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     let sample_value: f64 = sample as i32 as f64;
     //println!("sample_value is: {}, weight_factor is {}", sample_value, weight_factor);
     prev.reliability = prev.reliability * weight_factor + sample_value * (1.0 - weight_factor);
-
 }
 
-fn update_ewma_pack(prev: &mut EWMAPack,
+fn update_ewma_pack(
+    prev: &mut EWMAPack,
     previous_polling_time: Option<SystemTime>,
     current_polling_time: SystemTime,
-    sample: bool) {
-    let mut sample_age = Duration::from_secs(60*60*2); // default weighting, in case we haven't polled it yet
+    sample: bool,
+) {
+    let mut sample_age = Duration::from_secs(60 * 60 * 2); // default weighting, in case we haven't polled it yet
 
     if let Some(previous_polling_time) = previous_polling_time {
         if let Ok(duration) = current_polling_time.duration_since(previous_polling_time) {
@@ -390,9 +420,9 @@ fn update_ewma_pack(prev: &mut EWMAPack,
     }
     update_ewma(&mut prev.stat_2_hours, sample_age, sample);
     update_ewma(&mut prev.stat_8_hours, sample_age, sample);
-    update_ewma(&mut prev.stat_1day,    sample_age, sample);
-    update_ewma(&mut prev.stat_1week,   sample_age, sample);
-    update_ewma(&mut prev.stat_1month,  sample_age, sample);
+    update_ewma(&mut prev.stat_1day, sample_age, sample);
+    update_ewma(&mut prev.stat_1week, sample_age, sample);
+    update_ewma(&mut prev.stat_1month, sample_age, sample);
 }
 
 fn get_classification(
@@ -447,23 +477,20 @@ fn get_classification(
     if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0 {
         return PeerClassification::AllGood;
     };
-    if ewmas.stat_1day.reliability    > 0.55 && ewmas.stat_1day.count    > 8.0 {
+    if ewmas.stat_1day.reliability > 0.55 && ewmas.stat_1day.count > 8.0 {
         return PeerClassification::AllGood;
     };
-    if ewmas.stat_1week.reliability   > 0.45 && ewmas.stat_1week.count   > 16.0 {
+    if ewmas.stat_1week.reliability > 0.45 && ewmas.stat_1week.count > 16.0 {
         return PeerClassification::AllGood;
     };
-    if ewmas.stat_1month.reliability  > 0.35 && ewmas.stat_1month.count  > 32.0 {
+    if ewmas.stat_1month.reliability > 0.35 && ewmas.stat_1month.count > 32.0 {
         return PeerClassification::AllGood;
     };
-
-
-
 
     // at least one success in the last 2 hours
     if let Some(last_success) = peer_stats.last_success {
         if let Ok(duration) = last_success.elapsed() {
-            if duration <= Duration::from_secs(60*60*2) {
+            if duration <= Duration::from_secs(60 * 60 * 2) {
                 return PeerClassification::MerelySyncedEnough;
             }
         }
@@ -489,21 +516,19 @@ fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
     return peer_address.port() == network.default_port();
 }
 
-
 enum CrawlingMode {
     FastAcquisition,
-    LongTermUpdates
+    LongTermUpdates,
 }
 
 #[tokio::main]
 async fn main() {
-    if let Ok((_softlimit, hardlimit)) = getrlimit(Resource::NOFILE)
-    {
+    if let Ok((_softlimit, hardlimit)) = getrlimit(Resource::NOFILE) {
         increase_nofile_limit(256); // hardlimit);
     }
     let max_inflight_conn = match getrlimit(Resource::NOFILE) {
         Ok((softlimit, _hardlimit)) => softlimit.min(4096), // limit at 4096 to avoid ridiculous network loads
-        _ => 256                                            // otherwise play it really safe
+        _ => 256,                                           // otherwise play it really safe
     };
 
     let network = Network::Mainnet;
@@ -544,7 +569,7 @@ async fn main() {
             CrawlingMode::FastAcquisition => {
                 fast_walker(&serving_nodes_shared, &mut internal_peer_tracker, network).await;
                 mode = CrawlingMode::LongTermUpdates;
-            },
+            }
             CrawlingMode::LongTermUpdates => {
                 return ();
                 //slow_walker(&serving_nodes_shared, &mut internal_peer_tracker, network, max_inflight_conn).await;
@@ -557,10 +582,11 @@ async fn main() {
     }
 }
 
-
-fn update_serving_nodes(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
-    internal_peer_tracker: &HashMap<SocketAddr, Option<PeerStats>>) {
-    let mut primary_nodes   = HashSet::new();
+fn update_serving_nodes(
+    serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+    internal_peer_tracker: &HashMap<SocketAddr, Option<PeerStats>>,
+) {
+    let mut primary_nodes = HashSet::new();
     let mut alternate_nodes = HashSet::new();
 
     for (key, value) in internal_peer_tracker {
@@ -583,29 +609,25 @@ fn update_serving_nodes(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     *unlocked = new_nodes.clone();
 }
 
-
-
-fn single_node_update(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+fn single_node_update(
+    serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     new_peer_address: &SocketAddr,
-    new_peer_stat:   &Option<PeerStats>) {
-
+    new_peer_stat: &Option<PeerStats>,
+) {
     let old_nodes = serving_nodes_shared.read().unwrap();
     let mut primary_nodes = old_nodes.primaries.clone();
     let mut alternate_nodes = old_nodes.alternates.clone();
     drop(old_nodes);
 
-
     match get_classification(new_peer_stat, new_peer_address, Network::Mainnet) {
         PeerClassification::AllGood => {
             primary_nodes.insert(new_peer_address.clone());
             alternate_nodes.remove(new_peer_address);
-
-        },
+        }
         PeerClassification::MerelySyncedEnough => {
             primary_nodes.remove(new_peer_address);
             alternate_nodes.insert(new_peer_address.clone());
-
-        },
+        }
         _ => {
             primary_nodes.remove(new_peer_address);
             alternate_nodes.remove(new_peer_address);
@@ -624,8 +646,9 @@ fn single_node_update(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
 async fn probe_and_update(
     proband_address: SocketAddr,
     old_stats: Option<PeerStats>,
-    network: Network
-) -> (SocketAddr, Option<(PeerStats, Vec<SocketAddr>)>) { // we always return the SockAddr of the server we probed, so we can reissue queries
+    network: Network,
+) -> (SocketAddr, Option<(PeerStats, Vec<SocketAddr>)>) {
+    // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
         None => PeerStats {
             total_attempts: 0,
@@ -639,7 +662,7 @@ async fn probe_and_update(
     };
     let mut found_peer_addresses = Vec::new();
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
-    let poll_res = test_a_server(proband_address, network,    Duration::from_secs(5)).await;
+    let poll_res = test_a_server(proband_address, network, Duration::from_secs(5)).await;
     let peers_res = probe_for_peers(proband_address, network, Duration::from_secs(5)).await;
     if let Some(peer_list) = peers_res {
         for peer in peer_list {
@@ -684,11 +707,11 @@ async fn probe_and_update(
         }
     }
     new_peer_stats.last_polled = Some(current_poll_time);
-    return (proband_address, Some((new_peer_stats, found_peer_addresses)));
+    return (
+        proband_address,
+        Some((new_peer_stats, found_peer_addresses)),
+    );
 }
-
-
-
 
 // async fn slow_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
 //     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>) {
@@ -716,15 +739,19 @@ async fn probe_and_update(
 //     }
 // }
 
-
-
-async fn fast_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+async fn fast_walker(
+    serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
-    network: Network) {
+    network: Network,
+) {
     let mut handles = FuturesUnordered::new();
 
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        handles.push(probe_and_update(proband_address.clone(), peer_stat.clone(), network));
+        handles.push(probe_and_update(
+            proband_address.clone(),
+            peer_stat.clone(),
+            network,
+        ));
     }
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
@@ -738,13 +765,22 @@ async fn fast_walker(serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
                 let key = peer.to_socket_addrs().unwrap().next().unwrap();
                 if !internal_peer_tracker.contains_key(&key) {
                     internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                    handles.push(probe_and_update(key.clone(), <Option<PeerStats>>::None, network));
+                    handles.push(probe_and_update(
+                        key.clone(),
+                        <Option<PeerStats>>::None,
+                        network,
+                    ));
                 }
             }
             println!("HashMap len: {:?}", internal_peer_tracker.len());
-        } else { // we gotta retry
+        } else {
+            // we gotta retry
             println!("RETRYING {:?}", peer_address);
-            handles.push(probe_and_update(peer_address.clone(), internal_peer_tracker[&peer_address].clone(), network))
+            handles.push(probe_and_update(
+                peer_address.clone(),
+                internal_peer_tracker[&peer_address].clone(),
+                network,
+            ))
         }
     }
 }
