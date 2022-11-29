@@ -643,7 +643,7 @@ async fn main() {
         let value = None;
         internal_peer_tracker.insert(key, value);
     }
-    let mut mode = CrawlingMode::LongTermUpdates;
+    let mut mode = CrawlingMode::FastAcquisition;
 
     loop {
         println!("starting Loop");
