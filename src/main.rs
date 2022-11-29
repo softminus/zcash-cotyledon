@@ -606,11 +606,11 @@ enum CrawlingMode {
 #[tokio::main]
 async fn main() {
     if let Ok((_softlimit, hardlimit)) = getrlimit(Resource::NOFILE) {
-        increase_nofile_limit(256); // hardlimit);
+        increase_nofile_limit(hardlimit);
     }
     let max_inflight_conn = match getrlimit(Resource::NOFILE) {
-        Ok((softlimit, _hardlimit)) => 102400, //softlimit.min(4096), // limit at 4096 to avoid ridiculous network loads
-        _ => 256,                              // otherwise play it really safe
+        Ok((softlimit, _hardlimit)) => softlimit.min(4096), // limit it to avoid hurting NAT middleboxes
+        _ => 128,                              // if we can't figure it out, play it really safe
     };
 
     let network = Network::Mainnet;
