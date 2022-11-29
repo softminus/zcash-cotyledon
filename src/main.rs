@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock, RwLock};
-use std::thread::sleep;
+use tokio::time::sleep;
 use std::time::{Duration, SystemTime};
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
@@ -679,7 +679,7 @@ async fn main() {
         }
         // just in case...we could add code to check if this does anything to find bugs with the incremental update
         update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
-        sleep(Duration::new(4, 0));
+        sleep(Duration::new(2, 0)).await;
         println!("done with getting results");
     }
 }
@@ -769,7 +769,7 @@ async fn probe_and_update(
     };
     let mut found_peer_addresses = Vec::new();
     let mut rng = rand::thread_rng();
-    sleep(Duration::from_secs(rng.gen_range(0..32)));
+    sleep(Duration::from_secs(rng.gen_range(100..128))).await;
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let poll_res = test_a_server(proband_address, network, timeouts.hash_timeout).await;
     let peers_res = probe_for_peers(proband_address, network, timeouts.peers_timeout).await;
