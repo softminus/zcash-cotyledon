@@ -170,7 +170,7 @@ static HASH_CHECKPOINTS: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     for proband_height in proband_heights_vec.iter().rev().take(2) {
         if let Some(hash) = checkpoint.hash(*proband_height) {
             proband_hashes.insert(hash);
-            println!("height {:?} has hash {:?}", proband_height, hash);
+            println!("preparing proband hashes...height {:?} has hash {:?}", proband_height, hash);
         }
     }
     proband_hashes
@@ -262,7 +262,7 @@ async fn test_a_server(
                                     println!("{:?}", returned_hashes);
                                     let intersection_count =
                                         returned_hashes.intersection(&HASH_CHECKPOINTS).count();
-                                    println!("intersection_count is {:?}", intersection_count);
+                                    // println!("intersection_count is {:?}", intersection_count);
                                     if intersection_count == HASH_CHECKPOINTS.len() {
                                         // All requested blocks are there and hash OK
                                         return PollStatus::BlockRequestOK(peer_derived_data);
