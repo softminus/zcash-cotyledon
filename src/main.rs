@@ -429,29 +429,40 @@ fn update_ewma_pack(
 
 
 
-fn poll_this_time_around(peer_stats: &Option<PeerStats>) -> bool {
-    match peer_stats {
+fn poll_this_time_around(peer_stats: &Option<PeerStats>, peer_address: &SocketAddr, network: Network) -> bool {
+    let peer_classification = get_classification(peer_stats, peer_address, network);
+    match peer_classification {
+        PeerClassification::Unknown            => {true}, // never tried a connection, so let's give it a try
+        PeerClassification::BeyondUseless      => {peer_last_polled_comparison(peer_stats.as_ref().unwrap(), Duration::from_secs(2 * 60 * 60))}, // 4 hours, it's likely garbage
+        PeerClassification::Bad                => {peer_last_polled_comparison(peer_stats.as_ref().unwrap(), Duration::from_secs(2 * 60 * 60))}, // 2 hours
+        PeerClassification::MerelySyncedEnough => {peer_last_polled_comparison(peer_stats.as_ref().unwrap(), exponential_acquisition_threshold(peer_stats.as_ref().unwrap()))},
+        PeerClassification::AllGood            => {peer_last_polled_comparison(peer_stats.as_ref().unwrap(), exponential_acquisition_threshold(peer_stats.as_ref().unwrap()))},
+    }
+}
+
+fn peer_last_polled_comparison(peer_stats: &PeerStats, duration_threshold: Duration) -> bool {
+    match peer_stats.last_polled {
         None => {true},
-        Some(peer_stats) => {
-            match peer_stats.last_polled {
-                None => {true},
-                Some(previous_polling_time) => {
-                    if let Ok(duration) = SystemTime::now().duration_since(previous_polling_time) {
-                        if duration > Duration::from_secs(100) {
-                            return true
-                        } else {
-                            return false;
-                        }
-                    } else {
-                        return true;
-                    }
-                }
+        Some(previous_polling_time) => {
+            match SystemTime::now().duration_since(previous_polling_time) {
+                Ok(duration) => { return duration > duration_threshold},
+                _ => {true}
             }
         }
     }
 }
 
 
+fn exponential_acquisition_threshold(peer_stats: &PeerStats) -> Duration {
+    match peer_stats.total_attempts {
+        0..=1   => {Duration::from_secs(1 * 60)},
+        2..=3   => {Duration::from_secs(2 * 60)},
+        4..=7   => {Duration::from_secs(4 * 60)},
+        8..=15  => {Duration::from_secs(8 * 60)},
+        16..=32 => {Duration::from_secs(16 * 60)},
+        _       => {Duration::from_secs(30 * 60)},
+    }
+}
 
 fn get_classification(
     peer_stats: &Option<PeerStats>,
@@ -470,7 +481,7 @@ fn get_classification(
 
     if peer_stats.peer_derived_data.is_none() {
         // we tried, but never been able to negotiate a connection
-        return PeerClassification::Bad;
+        return PeerClassification::BeyondUseless;
     }
 
     let peer_derived_data = peer_stats.peer_derived_data.as_ref().unwrap();
@@ -523,7 +534,7 @@ fn get_classification(
             }
         }
     }
-    return PeerClassification::Bad;
+    return PeerClassification::Unknown;
 }
 
 fn required_height(network: Network) -> Height {
@@ -775,7 +786,7 @@ async fn slow_walker(
 ) {
     let mut batch_queries = Vec::new();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        if poll_this_time_around(peer_stat) {
+        if poll_this_time_around(peer_stat, proband_address, network) {
             batch_queries.push(probe_and_update(
                 proband_address.clone(),
                 peer_stat.clone(),
@@ -796,12 +807,12 @@ async fn slow_walker(
             let new_peer_stat = new_peer_stat.clone();
             internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
             single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
-            // for peer in new_peers {
-            //     let key = peer.to_socket_addrs().unwrap().next().unwrap();
-            //     if !internal_peer_tracker.contains_key(&key) {
-            //         internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-            //     }
-            // }
+            for peer in new_peers {
+                let key = peer.to_socket_addrs().unwrap().next().unwrap();
+                if !internal_peer_tracker.contains_key(&key) {
+                    internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+                }
+            }
             println!("HashMap len: {:?}", internal_peer_tracker.len());
         } else {
             print!("SLOW WALKER MUST RETRY {:?} NEXT TIME AROUND", peer_address);
