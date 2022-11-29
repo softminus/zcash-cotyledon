@@ -170,7 +170,10 @@ static HASH_CHECKPOINTS: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     for proband_height in proband_heights_vec.iter().rev().take(2) {
         if let Some(hash) = checkpoint.hash(*proband_height) {
             proband_hashes.insert(hash);
-            println!("preparing proband hashes...height {:?} has hash {:?}", proband_height, hash);
+            println!(
+                "preparing proband hashes...height {:?} has hash {:?}",
+                proband_height, hash
+            );
         }
     }
     proband_hashes
@@ -335,12 +338,12 @@ struct EWMAState {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PeerClassification {
-    AllGood,            // Node meets all the legacy criteria (including uptime), and is fully servable to clients
+    AllGood, // Node meets all the legacy criteria (including uptime), and is fully servable to clients
     MerelySyncedEnough, // Node recently could serve us a recent-enough block (it is syncing or has synced to zcash chain)
     // but doesn't meet uptime criteria.
-    Bad,                // Node is bad for some reason, but we could connect to it
-    BeyondUseless,      // We tried, but weren't even able to negotiate a connection
-    Unknown,            // We got told about this node but haven't yet queried it
+    Bad,           // Node is bad for some reason, but we could connect to it
+    BeyondUseless, // We tried, but weren't even able to negotiate a connection
+    Unknown,       // We got told about this node but haven't yet queried it
 }
 
 #[derive(Debug, Clone)]
@@ -427,40 +430,82 @@ fn update_ewma_pack(
     update_ewma(&mut prev.stat_1month, sample_age, sample);
 }
 
-
-
-fn poll_this_time_around(peer_stats: &Option<PeerStats>, peer_address: &SocketAddr, network: Network) -> bool {
+fn poll_this_time_around(
+    peer_stats: &Option<PeerStats>,
+    peer_address: &SocketAddr,
+    network: Network,
+) -> bool {
     let peer_classification = get_classification(peer_stats, peer_address, network);
     match peer_classification {
-        PeerClassification::Unknown            => {true}, // never tried a connection, so let's give it a try
-        PeerClassification::BeyondUseless      => {peer_last_polled_comparison(peer_stats.as_ref().unwrap(), Duration::from_secs(2 * 60 * 60))}, // 4 hours, it's likely garbage
-        PeerClassification::Bad                => {peer_last_polled_comparison(peer_stats.as_ref().unwrap(), Duration::from_secs(2 * 60 * 60))}, // 2 hours
-        PeerClassification::MerelySyncedEnough => {peer_last_polled_comparison(peer_stats.as_ref().unwrap(), exponential_acquisition_threshold(peer_stats.as_ref().unwrap()))},
-        PeerClassification::AllGood            => {peer_last_polled_comparison(peer_stats.as_ref().unwrap(), exponential_acquisition_threshold(peer_stats.as_ref().unwrap()))},
+        PeerClassification::Unknown => {
+            println!(
+                "node {:?} is Unknown, we try it this time around",
+                peer_address
+            );
+            true // never tried a connection, so let's give it a try
+        }
+        PeerClassification::BeyondUseless => {
+            println!(
+                "node {:?} is BeyondUseless, we try it again in 4 hours",
+                peer_address
+            );
+            peer_last_polled_comparison(
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(4 * 60 * 60), // 4 hours, it's likely garbage
+            )
+        }
+        PeerClassification::Bad => {
+            println!("node {:?} is Bad, we try it again in 2 hours", peer_address);
+            peer_last_polled_comparison(
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(2 * 60 * 60), // 2 hours
+            )
+        }
+        PeerClassification::MerelySyncedEnough => {
+            println!(
+                "node {:?} is MerelySyncedEnough, we try it again in {:?}",
+                peer_address,
+                exponential_acquisition_threshold(peer_stats.as_ref().unwrap())
+            );
+            peer_last_polled_comparison(
+                peer_stats.as_ref().unwrap(),
+                exponential_acquisition_threshold(peer_stats.as_ref().unwrap()),
+            )
+        }
+        PeerClassification::AllGood => {
+            println!(
+                "node {:?} is AllGood, we try it again in {:?}",
+                peer_address,
+                exponential_acquisition_threshold(peer_stats.as_ref().unwrap())
+            );
+            peer_last_polled_comparison(
+                peer_stats.as_ref().unwrap(),
+                exponential_acquisition_threshold(peer_stats.as_ref().unwrap()),
+            )
+        }
     }
 }
 
 fn peer_last_polled_comparison(peer_stats: &PeerStats, duration_threshold: Duration) -> bool {
     match peer_stats.last_polled {
-        None => {true},
+        None => true,
         Some(previous_polling_time) => {
             match SystemTime::now().duration_since(previous_polling_time) {
-                Ok(duration) => { return duration > duration_threshold},
-                _ => {true}
+                Ok(duration) => return duration > duration_threshold,
+                _ => true,
             }
         }
     }
 }
 
-
 fn exponential_acquisition_threshold(peer_stats: &PeerStats) -> Duration {
     match peer_stats.total_attempts {
-        0..=1   => {Duration::from_secs(1 * 60)},
-        2..=3   => {Duration::from_secs(2 * 60)},
-        4..=7   => {Duration::from_secs(4 * 60)},
-        8..=15  => {Duration::from_secs(8 * 60)},
-        16..=32 => {Duration::from_secs(16 * 60)},
-        _       => {Duration::from_secs(30 * 60)},
+        0..=1 => Duration::from_secs(1 * 60),
+        2..=3 => Duration::from_secs(2 * 60),
+        4..=7 => Duration::from_secs(4 * 60),
+        8..=15 => Duration::from_secs(8 * 60),
+        16..=32 => Duration::from_secs(16 * 60),
+        _ => Duration::from_secs(30 * 60),
     }
 }
 
@@ -794,7 +839,10 @@ async fn slow_walker(
                 &timeouts,
             ));
         } else {
-            println!("NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY", proband_address);
+            println!(
+                "NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY",
+                proband_address
+            );
         }
     }
 
@@ -815,7 +863,7 @@ async fn slow_walker(
             }
             println!("HashMap len: {:?}", internal_peer_tracker.len());
         } else {
-            print!("SLOW WALKER MUST RETRY {:?} NEXT TIME AROUND", peer_address);
+            println!("SLOW WALKER MUST RETRY {:?} NEXT TIME AROUND", peer_address);
         }
     }
 }
