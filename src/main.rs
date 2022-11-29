@@ -335,11 +335,12 @@ struct EWMAState {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PeerClassification {
+    AllGood,            // Node meets all the legacy criteria (including uptime), and is fully servable to clients
     MerelySyncedEnough, // Node recently could serve us a recent-enough block (it is syncing or has synced to zcash chain)
     // but doesn't meet uptime criteria.
-    AllGood, // Node meets all the legacy criteria (including uptime), and is fully servable to clients
-    Bad,     // Node is bad for some reason
-    Unknown, // We got told about this node but haven't yet queried it
+    Bad,                // Node is bad for some reason, but we could connect to it
+    BeyondUseless,      // We tried, but weren't even able to negotiate a connection
+    Unknown,            // We got told about this node but haven't yet queried it
 }
 
 #[derive(Debug, Clone)]
