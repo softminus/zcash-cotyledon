@@ -15,6 +15,7 @@ use zebra_chain::parameters::Network;
 use zebra_network::types::PeerServices;
 use zebra_network::{connect_isolated_tcp_direct, InventoryResponse, Request, Response, Version};
 //use zebra_network::protocol::external::types::Version;
+use rand::Rng;
 use rlimit::{getrlimit, increase_nofile_limit, Resource};
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedReply, SeedRequest};
@@ -348,8 +349,8 @@ enum PeerClassification {
 
 #[derive(Debug, Clone)]
 struct PeerStats {
-    total_attempts: i32,
-    total_successes: i32,
+    total_attempts: u64,
+    total_successes: u64,
     ewma_pack: EWMAPack,
     last_polled: Option<SystemTime>,
     last_success: Option<SystemTime>,
@@ -767,6 +768,8 @@ async fn probe_and_update(
         Some(old_stats) => old_stats.clone(),
     };
     let mut found_peer_addresses = Vec::new();
+    let mut rng = rand::thread_rng();
+    sleep(Duration::from_secs(rng.gen_range(0..32)));
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let poll_res = test_a_server(proband_address, network, timeouts.hash_timeout).await;
     let peers_res = probe_for_peers(proband_address, network, timeouts.peers_timeout).await;
