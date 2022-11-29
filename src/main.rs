@@ -446,12 +446,12 @@ fn poll_this_time_around(
         }
         PeerClassification::BeyondUseless => {
             println!(
-                "node {:?} is BeyondUseless, we try it again in 4 hours",
+                "node {:?} is BeyondUseless, we try it again in 8 hours",
                 peer_address
             );
             peer_last_polled_comparison(
                 peer_stats.as_ref().unwrap(),
-                Duration::from_secs(4 * 60 * 60), // 4 hours, it's likely garbage
+                Duration::from_secs(8 * 60 * 60), // 8 hours, it's likely garbage
             )
         }
         PeerClassification::Bad => {
