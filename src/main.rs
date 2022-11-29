@@ -499,13 +499,10 @@ fn peer_last_polled_comparison(peer_stats: &PeerStats, duration_threshold: Durat
 }
 
 fn exponential_acquisition_threshold(peer_stats: &PeerStats) -> Duration {
-    match peer_stats.total_attempts {
-        0..=1 => Duration::from_secs(1 * 60),
-        2..=3 => Duration::from_secs(2 * 60),
-        4..=7 => Duration::from_secs(4 * 60),
-        8..=15 => Duration::from_secs(8 * 60),
-        16..=32 => Duration::from_secs(16 * 60),
-        _ => Duration::from_secs(30 * 60),
+    if peer_stats.total_attempts < 32 {
+        Duration::from_secs(peer_stats.total_attempts * (60 as u64))
+    } else {
+        Duration::from_secs(32 * 60)
     }
 }
 
