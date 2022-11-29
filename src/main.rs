@@ -269,6 +269,7 @@ async fn test_a_server(
                                     // println!("intersection_count is {:?}", intersection_count);
                                     if intersection_count == HASH_CHECKPOINTS.len() {
                                         // All requested blocks are there and hash OK
+                                        println!("Peer {:?} returned good hashes", peer_addr);
                                         return PollStatus::BlockRequestOK(peer_derived_data);
                                     }
                                     // node returned a Blocks response, but it wasn't complete/correct for some reason
@@ -769,7 +770,7 @@ async fn probe_and_update(
     };
     let mut found_peer_addresses = Vec::new();
     let mut rng = rand::thread_rng();
-    sleep(Duration::from_secs(rng.gen_range(100..128))).await;
+    sleep(Duration::from_secs(rng.gen_range(10..128))).await;
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let poll_res = test_a_server(proband_address, network, timeouts.hash_timeout).await;
     let peers_res = probe_for_peers(proband_address, network, timeouts.peers_timeout).await;
