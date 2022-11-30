@@ -757,6 +757,7 @@ async fn probe_and_update(
     old_stats: Option<PeerStats>,
     network: Network,
     timeouts: &Timeouts,
+    random_delay: Duration,
 ) -> (SocketAddr, Option<(PeerStats, Vec<SocketAddr>)>) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
@@ -771,8 +772,7 @@ async fn probe_and_update(
         Some(old_stats) => old_stats.clone(),
     };
     let mut found_peer_addresses = Vec::new();
-    let mut rng = rand::thread_rng();
-    //sleep(Duration::from_secs(rng.gen_range(10..128))).await;
+    sleep(random_delay).await;
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let poll_res = test_a_server(proband_address, network, timeouts.hash_timeout).await;
     let peers_res = probe_for_peers(proband_address, network, timeouts.peers_timeout).await;
@@ -832,6 +832,7 @@ async fn slow_walker(
     max_inflight_conn: usize,
     timeouts: Timeouts,
 ) {
+    let mut rng = rand::thread_rng();
     let mut batch_queries = Vec::new();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
         if poll_this_time_around(peer_stat, proband_address, network) {
@@ -840,6 +841,7 @@ async fn slow_walker(
                 peer_stat.clone(),
                 network,
                 &timeouts,
+                Duration::from_secs(rng.gen_range(0..128)),
             ));
         } else {
             println!(
@@ -878,13 +880,14 @@ async fn fast_walker(
     timeouts: Timeouts,
 ) {
     let mut handles = FuturesUnordered::new();
-
+    let mut rng = rand::thread_rng();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
         handles.push(probe_and_update(
             proband_address.clone(),
             peer_stat.clone(),
             network,
             &timeouts,
+            Duration::from_secs(rng.gen_range(0..32)),
         ));
     }
     while let Some(probe_result) = handles.next().await {
@@ -904,6 +907,7 @@ async fn fast_walker(
                         <Option<PeerStats>>::None,
                         network,
                         &timeouts,
+                        Duration::from_secs(rng.gen_range(0..128)),
                     ));
                 }
             }
@@ -916,6 +920,7 @@ async fn fast_walker(
                 internal_peer_tracker[&peer_address].clone(),
                 network,
                 &timeouts,
+                Duration::from_secs(rng.gen_range(0..128)),
             ))
         }
     }
