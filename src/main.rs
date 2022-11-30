@@ -853,8 +853,8 @@ async fn slow_walker(
     while let Some(probe_result) = stream.next().await {
         let peer_address = probe_result.0;
         if let Some((new_peer_stat, new_peers)) = probe_result.1 {
-            println!("new peer stat: {:?}", new_peer_stat);
-            println!("new peers: {:?}", new_peers);
+            println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
+            //println!("new peers: {:?}", new_peers);
             let new_peer_stat = new_peer_stat.clone();
             internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
             single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
@@ -890,8 +890,8 @@ async fn fast_walker(
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
         if let Some((new_peer_stat, new_peers)) = probe_result.1 {
-            println!("new peer stat: {:?}", new_peer_stat);
-            println!("new peers: {:?}", new_peers);
+            println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
+            //println!("new peers: {:?}", new_peers);
             let new_peer_stat = new_peer_stat.clone();
             internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
             single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
