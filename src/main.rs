@@ -263,7 +263,7 @@ async fn test_a_server(
                                             returned_hashes.insert(actual_block.hash());
                                         }
                                     }
-                                    println!("{:?}", returned_hashes);
+                                    //println!("{:?}", returned_hashes);
                                     let intersection_count =
                                         returned_hashes.intersection(&HASH_CHECKPOINTS).count();
                                     // println!("intersection_count is {:?}", intersection_count);
