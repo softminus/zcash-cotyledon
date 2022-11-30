@@ -108,7 +108,7 @@ impl DnsContext {
 
         let endpoint = dnsrr::LowerName::from(dnsrr::Name::from_str("dnsseed.z.cash").unwrap());
 
-        println!("query is {:?}", endpoint.zone_of(request.query().name()));
+        println!("query is {:?}", endpoint.zone_of(request.query().name())); // if this fails, NXDomain. the record doesn't exist
 
         let builder = MessageResponseBuilder::from_message_request(request);
         let mut header = dnsop::Header::response_from_request(request.header());
@@ -141,13 +141,18 @@ impl DnsContext {
                                 ))
                             }
                         }
-                    _ => {return None;}
+                    _ => {}
                     }
                 }
             }
         }
-        let response = builder.build(header, records.iter(), &[], &[], &[]);
-        Some(response_handle.send_response(response).await.unwrap()) // fixme, handle failure OK.
+
+        match request.query().query_type() {
+            dnsrr::RecordType::A | dnsrr::RecordType::AAAA => { // if it's neither of those, NODATA
+                let response = builder.build(header, records.iter(), &[], &[], &[]);
+                Some(response_handle.send_response(response).await.unwrap())
+            },
+        }
     }
 }
 #[derive(Debug, Clone)]
