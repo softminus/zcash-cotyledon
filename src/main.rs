@@ -467,22 +467,22 @@ fn poll_this_time_around(
             println!(
                 "node {:?} is MerelySyncedEnough, we try it again in {:?}",
                 peer_address,
-                exponential_acquisition_threshold(peer_stats.as_ref().unwrap())
+                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap())/2)
             );
             peer_last_polled_comparison(
                 peer_stats.as_ref().unwrap(),
-                exponential_acquisition_threshold(peer_stats.as_ref().unwrap()),
+                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap())/2)
             )
         }
         PeerClassification::AllGood => {
             println!(
                 "node {:?} is AllGood, we try it again in {:?}",
                 peer_address,
-                exponential_acquisition_threshold(peer_stats.as_ref().unwrap())
+                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap()))
             );
             peer_last_polled_comparison(
                 peer_stats.as_ref().unwrap(),
-                exponential_acquisition_threshold(peer_stats.as_ref().unwrap()),
+                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap()))
             )
         }
     }
@@ -500,11 +500,11 @@ fn peer_last_polled_comparison(peer_stats: &PeerStats, duration_threshold: Durat
     }
 }
 
-fn exponential_acquisition_threshold(peer_stats: &PeerStats) -> Duration {
+fn exponential_acquisition_threshold_secs(peer_stats: &PeerStats) -> u64 {
     if peer_stats.total_attempts < 32 {
-        Duration::from_secs(peer_stats.total_attempts * (60 as u64))
+        peer_stats.total_attempts * 2 * (60 as u64)
     } else {
-        Duration::from_secs(32 * 60)
+        32 * 60
     }
 }
 
