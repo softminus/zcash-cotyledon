@@ -772,7 +772,7 @@ async fn probe_and_update(
     };
     let mut found_peer_addresses = Vec::new();
     let mut rng = rand::thread_rng();
-    sleep(Duration::from_secs(rng.gen_range(10..128))).await;
+    //sleep(Duration::from_secs(rng.gen_range(10..128))).await;
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let poll_res = test_a_server(proband_address, network, timeouts.hash_timeout).await;
     let peers_res = probe_for_peers(proband_address, network, timeouts.peers_timeout).await;
