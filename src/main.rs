@@ -116,22 +116,33 @@ impl DnsContext {
         let mut records = Vec::new();
         {
             let serving_nodes = self.serving_nodes_shared.read().unwrap();
-
             for peer in serving_nodes
                 .primaries
                 .iter()
                 .chain(serving_nodes.alternates.iter())
             {
                 if dns_servable(*peer, self.serving_network) {
-                    let rdata = match peer.ip() {
-                        IpAddr::V4(ipv4) => dnsrr::RData::A(ipv4),
-                        IpAddr::V6(ipv6) => dnsrr::RData::AAAA(ipv6),
-                    };
-                    records.push(dnsrr::Record::from_rdata(
-                        request.query().name().into(),
-                        60,
-                        rdata,
-                    ))
+                    match request.query().query_type() {
+                        dnsrr::RecordType::A => {
+                            if let IpAddr::V4(ipv4) = peer.ip() {
+                                records.push(dnsrr::Record::from_rdata(
+                                    request.query().name().into(),
+                                    60,
+                                    dnsrr::RData::A(ipv4),
+                                ))
+                            }
+                        },
+                        dnsrr::RecordType::AAAA => {
+                            if let IpAddr::V6(ipv6) = peer.ip() {
+                                records.push(dnsrr::Record::from_rdata(
+                                    request.query().name().into(),
+                                    60,
+                                    dnsrr::RData::AAAA(ipv6),
+                                ))
+                            }
+                        }
+                    _ => {return None;}
+                    }
                 }
             }
         }
