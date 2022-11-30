@@ -661,7 +661,9 @@ async fn main() {
                     timeouts,
                 )
                 .await;
-                mode = CrawlingMode::LongTermUpdates;
+                if internal_peer_tracker.len() > 1024 {
+                    mode = CrawlingMode::LongTermUpdates;
+                }
             }
             CrawlingMode::LongTermUpdates => {
                 let timeouts = Timeouts {
