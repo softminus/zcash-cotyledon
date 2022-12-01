@@ -243,7 +243,7 @@ async fn test_a_server(
     network: Network,
     connection_timeout: Duration,
 ) -> PollStatus {
-    println!("Starting new connection: peer addr is {:?}", peer_addr);
+    println!("Starting new hash probe connection: peer addr is {:?}", peer_addr);
     let connection = connect_isolated_tcp_direct(
         network,
         peer_addr,
@@ -354,7 +354,7 @@ async fn probe_for_peers(
     network: Network,
     connection_timeout: Duration,
 ) -> Option<Vec<MetaAddr>> {
-    println!("Starting new connection: peer addr is {:?}", peer_addr);
+    println!("Starting peer probe connection: peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(
         network,
         peer_addr,
