@@ -31,10 +31,10 @@ tower = { version = "0.4.13", features = ["retry", "discover", "load", "load-she
 #hyper = { version = "0.14", features = ["full"] }
 trust-dns-server = "0.22.0"
 
-zebra-network = {path = "/Users/sasha_work/repos/zebra/zebra-network"}
-zebra-chain = {path = "/Users/sasha_work/repos/zebra/zebra-chain"}
-zebra-state = {path= "/Users/sasha_work/repos/zebra/zebra-state"}
-zebra-consensus = {path= "/Users/sasha_work/repos/zebra/zebra-consensus"}
+zebra-network = "1.0.0-beta.17"
+zebra-chain = "1.0.0-beta.17"
+zebra-state = "1.0.0-beta.17"
+zebra-consensus = "1.0.0-beta.17"
 
 tonic = "0.7"
 prost = "0.10"
