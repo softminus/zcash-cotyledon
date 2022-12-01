@@ -352,15 +352,17 @@ async fn test_a_server(
 async fn probe_for_peers(
     peer_addr: SocketAddr,
     network: Network,
-    connection_timeout: Duration,
-) -> Option<Vec<MetaAddr>> {
+    timeouts: &Timeouts,
+    random_delay: Duration,
+) -> (SocketAddr, Option<PeerProbeResult>) {
+    sleep(random_delay).await;
     println!("Starting peer probe connection: peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(
         network,
         peer_addr,
         String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
     );
-    let the_connection = timeout(connection_timeout, the_connection);
+    let the_connection = timeout(timeouts.peers_timeout, the_connection);
     let x = the_connection.await;
     if let Ok(x) = x {
         match x {
@@ -376,16 +378,16 @@ async fn probe_for_peers(
                         }
                     }
                 }
-                return peers_vec;
+                return (peer_addr, Some(PeerProbeResult::PeersResult(peers_vec)));
             } // ok connect
             Err(error) => {
                 println!("Peers connection with {:?} failed: {:?}", peer_addr, error);
-                return None;
+                return (peer_addr, None);
             }
         };
     } else {
         println!("Peers connection with {:?} TIMED OUT: {:?}", peer_addr, x);
-        None
+        (peer_addr, None)
     }
 }
 
@@ -697,7 +699,7 @@ async fn main() {
     dns_server.register_socket(UdpSocket::bind(dns_socket).await.unwrap());
     tokio::spawn(dns_server.block_until_done());
 
-    let initial_peer_addrs = ["35.230.70.77:8233", "157.245.172.190:8233"];
+    let initial_peer_addrs = ["20.47.97.70:8233", "51.79.229.21:8233", "34.73.242.102:8233", "51.77.64.61:8233", "18.117.148.170:8233", "85.15.179.171:8233", "18.189.228.115:8233", "139.99.123.157:8233", "3.72.134.66:8233", "157.90.89.105:9058", "142.132.202.124:8836", "51.81.154.19:30834", "147.135.11.134:8233", "37.59.32.10:8233", "78.46.46.252:8233", "116.62.229.19:8233", "51.178.76.85:8836", "176.34.40.41:8233", "162.55.103.190:8233", "135.181.79.230:8233", "209.141.47.197:8233", "51.222.245.186:8233", "8.218.10.114:8233", "94.156.174.100:8233", "88.80.148.28:8233", "144.76.112.237:8233", "51.81.184.90:30834", "51.195.234.88:2838", "144.217.11.155:8233", "65.108.220.35:8233", "51.77.64.59:8233", "91.199.137.99:8233", "88.198.48.91:8233", "18.217.102.40:8233", "34.255.6.39:5001", "91.206.16.214:8233", "109.190.117.131:8233", "65.21.137.242:8233", "8.219.76.216:8233", "203.96.179.202:8233", "51.210.114.183:8836", "13.231.190.41:8233", "162.19.139.181:8233", "65.108.41.222:20005", "62.210.69.194:8233", "135.181.18.180:8233", "51.195.63.10:30834", "95.217.78.170:8233", "51.79.57.29:8233", "178.234.34.18:8233", "47.242.184.215:8233", "141.95.45.187:30834", "8.218.11.43:8233", "162.19.139.183:8235", "142.132.212.130:8836", "47.90.209.31:8233", "157.90.88.178:9058", "23.129.64.30:8233", "104.207.139.34:8233", "162.19.139.182:8233", "135.148.55.16:8233", "84.75.28.247:8233", "46.249.236.211:8233", "47.242.8.170:8233", "44.197.66.202:8233", "73.172.228.152:8233", "51.210.216.76:8836", "165.232.125.107:8233", "194.135.81.61:8233", "50.7.29.20:8233", "52.28.203.21:8233", "8.214.158.97:8233", "51.210.208.201:8836", "221.223.25.99:2331", "54.229.33.6:5001", "104.233.147.162:8233", "116.203.188.195:8233", "124.126.140.40:2331", "51.79.230.103:8233", "47.229.106.87:8233", "35.72.109.227:8233", "47.89.158.145:8233", "162.19.139.183:8233", "3.16.30.39:8233", "23.88.71.118:8233", "65.21.40.28:8233", "46.4.192.189:8233", "173.212.197.63:8233", "15.235.85.30:8233", "51.77.64.51:8233", "7.252.44.174:8233", "3.252.40.246:5001", "8.209.80.185:8233", "8.209.65.101:8233", "51.210.220.135:8836", "35.91.16.78:8233", "162.19.136.65:30834", "161.97.155.203:8233", "120.24.79.67:8233", "195.201.111.115:8233", "23.16.98.249:8233", "51.210.216.77:8836", "116.202.53.174:8533", "35.233.224.178:8233", "51.222.254.36:8233", "97.119.97.142:8233", "5.9.74.158:8233", "8.210.73.119:8233", "116.202.170.226:8233", "51.81.184.89:30834", "51.178.76.73:8836", "54.67.54.98:8233", "51.210.208.202:8836", "5.2.75.10:8233", "168.119.147.118:8233", "65.108.41.222:21005", "47.243.196.68:8233", "54.238.23.140:8233", "64.201.122.142:54324", "54.145.30.137:8233", "54.36.61.123:8233"];
     let mut internal_peer_tracker: HashMap<SocketAddr, Option<PeerStats>> = HashMap::new();
 
     for peer in initial_peer_addrs {
@@ -816,13 +818,18 @@ struct Timeouts {
     hash_timeout: Duration,
     peers_timeout: Duration,
 }
+#[derive(Debug, Clone)]
+enum PeerProbeResult {
+    HashResult(PeerStats),
+    PeersResult(Option<Vec<MetaAddr>>)
+}
 async fn probe_and_update(
     proband_address: SocketAddr,
     old_stats: Option<PeerStats>,
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
-) -> (SocketAddr, Option<PeerStats>) {
+) -> (SocketAddr, Option<PeerProbeResult>) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
         None => PeerStats {
@@ -877,7 +884,7 @@ async fn probe_and_update(
     new_peer_stats.last_polled = Some(current_poll_time);
     return (
         proband_address,
-        Some(new_peer_stats),
+        Some(PeerProbeResult::HashResult(new_peer_stats)),
     );
 }
 
@@ -899,6 +906,7 @@ async fn slow_walker(
                 &timeouts,
                 Duration::from_secs(rng.gen_range(0..256)),
             ));
+            batch_queries.push(probe_for_peers(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..256))));
         } else {
             println!(
                 "NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY",
@@ -920,7 +928,7 @@ async fn slow_walker(
         } else {
             println!("SLOW WALKER MUST RETRY {:?} NEXT TIME AROUND", peer_address);
         }
-        let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
+        // this needs to be pushed into the work queue, not executed like this
         if let Some(peer_list) = peers_res {
             for peer in peer_list {
                 let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
@@ -969,6 +977,7 @@ async fn fast_walker(
                 Duration::from_secs(rng.gen_range(0..1)),
             ))
         }
+        // this needs to be pushed into the work queue, not executed like this
         let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
         if let Some(peer_list) = peers_res {
             for peer in peer_list {
