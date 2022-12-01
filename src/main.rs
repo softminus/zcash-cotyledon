@@ -79,12 +79,12 @@ impl dns::RequestHandler for DnsContext {
     async fn handle_request<R: dns::ResponseHandler>(
         &self,
         request: &dns::Request,
-        response: R,
+        response_handle: R,
     ) -> dns::ResponseInfo {
-        match self.do_handle_request(request, response).await {
+        match self.do_handle_request(request, response_handle).await {
             Some(response_info) => response_info,
             None => {
-                println!("unable to respond to query {:?}", request);
+                println!("Failed to respond to query: {:?}", request.query());
                 let mut header = dnsop::Header::new();
                 header.set_response_code(dnsop::ResponseCode::ServFail);
                 header.into()
@@ -100,15 +100,23 @@ impl DnsContext {
         mut response_handle: R,
     ) -> Option<dns::ResponseInfo> {
         if request.op_code() != dnsop::OpCode::Query {
-            return None;
+            let response = MessageResponseBuilder::from_message_request(request);
+            return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::ServFail)).await.unwrap());
         }
         if request.message_type() != dnsop::MessageType::Query {
-            return None;
+            let response = MessageResponseBuilder::from_message_request(request);
+            return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::ServFail)).await.unwrap());
         }
-
+        if request.query().query_class() != dnsrr::DNSClass::IN {
+            let response = MessageResponseBuilder::from_message_request(request);
+            return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::ServFail)).await.unwrap());
+        }
         let endpoint = dnsrr::LowerName::from(dnsrr::Name::from_str("dnsseed.z.cash").unwrap());
-
-        println!("query is {:?}", endpoint.zone_of(request.query().name())); // if this fails, NXDomain. the record doesn't exist
+        println!("name is {:?}", *request.query().name() == endpoint);
+        if !endpoint.zone_of(request.query().name()) {
+            let response = MessageResponseBuilder::from_message_request(request);
+            return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::NXDomain)).await.unwrap());
+        }
 
         let builder = MessageResponseBuilder::from_message_request(request);
         let mut header = dnsop::Header::response_from_request(request.header());
@@ -141,18 +149,14 @@ impl DnsContext {
                                 ))
                             }
                         }
-                    _ => {}
+                    _ => {} // if the query is something other than A or AAAA, we'll have no records in the reply, and that means a NODATA
                     }
                 }
             }
         }
 
-        match request.query().query_type() {
-            dnsrr::RecordType::A | dnsrr::RecordType::AAAA => { // if it's neither of those, NODATA
-                let response = builder.build(header, records.iter(), &[], &[], &[]);
-                Some(response_handle.send_response(response).await.unwrap())
-            },
-        }
+        let response = builder.build(header, records.iter(), &[], &[], &[]);
+        Some(response_handle.send_response(response).await.unwrap())
     }
 }
 #[derive(Debug, Clone)]
