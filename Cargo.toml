@@ -31,10 +31,10 @@ tower = { version = "0.4.13", features = ["retry", "discover", "load", "load-she
 #hyper = { version = "0.14", features = ["full"] }
 trust-dns-server = "0.22.0"
 
-zebra-network = "1.0.0-beta.17"
-zebra-chain = "1.0.0-beta.17"
-zebra-state = "1.0.0-beta.17"
-zebra-consensus = "1.0.0-beta.17"
+zebra-network = {git = "https://github.com/ZcashFoundation/zebra"}
+zebra-chain = {git = "https://github.com/ZcashFoundation/zebra"}
+zebra-state = {git = "https://github.com/ZcashFoundation/zebra"}
+zebra-consensus = {git = "https://github.com/ZcashFoundation/zebra"}
 
 tonic = "0.7"
 prost = "0.10"
