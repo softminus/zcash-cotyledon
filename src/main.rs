@@ -902,7 +902,7 @@ async fn slow_walker(
                 peer_stat.clone(),
                 network,
                 &timeouts,
-                Duration::from_secs(rng.gen_range(0..128)),
+                Duration::from_secs(rng.gen_range(0..256)),
             ));
         } else {
             println!(
@@ -948,7 +948,7 @@ async fn fast_walker(
             peer_stat.clone(),
             network,
             &timeouts,
-            Duration::from_secs(rng.gen_range(0..32)),
+            Duration::from_secs(rng.gen_range(0..256)),
         ));
     }
     while let Some(probe_result) = handles.next().await {
@@ -968,7 +968,7 @@ async fn fast_walker(
                         <Option<PeerStats>>::None,
                         network,
                         &timeouts,
-                        Duration::from_secs(rng.gen_range(0..128)),
+                        Duration::from_secs(rng.gen_range(0..256)),
                     ));
                 }
             }
@@ -981,7 +981,7 @@ async fn fast_walker(
                 internal_peer_tracker[&peer_address].clone(),
                 network,
                 &timeouts,
-                Duration::from_secs(rng.gen_range(0..128)),
+                Duration::from_secs(rng.gen_range(0..256)),
             ))
         }
     }
