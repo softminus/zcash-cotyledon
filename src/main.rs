@@ -913,18 +913,18 @@ async fn slow_walker(
             let new_peer_stat = new_peer_stat.clone();
             internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
             single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
-            let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
-            if let Some(peer_list) = peers_res {
-                for peer in peer_list {
-                    let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
-                    if !internal_peer_tracker.contains_key(&key) {
-                        internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                    }
-                }
-            }
             println!("HashMap len: {:?}", internal_peer_tracker.len());
         } else {
             println!("SLOW WALKER MUST RETRY {:?} NEXT TIME AROUND", peer_address);
+        }
+        let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
+        if let Some(peer_list) = peers_res {
+            for peer in peer_list {
+                let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
+                if !internal_peer_tracker.contains_key(&key) {
+                    internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+                }
+            }
         }
     }
 }
@@ -954,23 +954,6 @@ async fn fast_walker(
             let new_peer_stat = new_peer_stat.clone();
             internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
             single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
-            
-            let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
-            if let Some(peer_list) = peers_res {
-                for peer in peer_list {
-                    let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
-                    if !internal_peer_tracker.contains_key(&key) {
-                        internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                        handles.push(probe_and_update(
-                            key.clone(),
-                            <Option<PeerStats>>::None,
-                            network,
-                            &timeouts,
-                            Duration::from_secs(rng.gen_range(0..256)),
-                        ));
-                    }
-                }
-            }
             println!("HashMap len: {:?}", internal_peer_tracker.len());
         } else {
             // we gotta retry
@@ -982,6 +965,22 @@ async fn fast_walker(
                 &timeouts,
                 Duration::from_secs(rng.gen_range(0..256)),
             ))
+        }
+        let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
+        if let Some(peer_list) = peers_res {
+            for peer in peer_list {
+                let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
+                if !internal_peer_tracker.contains_key(&key) {
+                    internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+                    handles.push(probe_and_update(
+                        key.clone(),
+                        <Option<PeerStats>>::None,
+                        network,
+                        &timeouts,
+                        Duration::from_secs(rng.gen_range(0..256)),
+                    ));
+                }
+            }
         }
     }
 }
