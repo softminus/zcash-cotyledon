@@ -946,7 +946,7 @@ async fn fast_walker(
             peer_stat.clone(),
             network,
             &timeouts,
-            Duration::from_secs(rng.gen_range(0..256)),
+            Duration::from_secs(rng.gen_range(0..64)),
         ));
     }
     while let Some(probe_result) = handles.next().await {
@@ -966,7 +966,7 @@ async fn fast_walker(
                 internal_peer_tracker[&peer_address].clone(),
                 network,
                 &timeouts,
-                Duration::from_secs(rng.gen_range(0..256)),
+                Duration::from_secs(rng.gen_range(0..64)),
             ))
         }
         let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
@@ -980,7 +980,7 @@ async fn fast_walker(
                         <Option<PeerStats>>::None,
                         network,
                         &timeouts,
-                        Duration::from_secs(rng.gen_range(0..256)),
+                        Duration::from_secs(rng.gen_range(0..64)),
                     ));
                 }
             }
