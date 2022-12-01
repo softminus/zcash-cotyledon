@@ -174,7 +174,7 @@ struct PeerDerivedData {
     _relay: bool,
 }
 
-static HASH_CHECKPOINTS: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
+static HASH_CHECKPOINTS_MAINNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     let checkpoint = CheckpointList::new(Network::Mainnet);
     let mut proband_heights = HashSet::new();
     let mut proband_hashes = HashSet::new();
@@ -199,6 +199,33 @@ static HASH_CHECKPOINTS: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     proband_hashes
 });
 
+
+static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
+    let checkpoint = CheckpointList::new(Network::Testnet);
+    let mut proband_heights = HashSet::new();
+    let mut proband_hashes = HashSet::new();
+    for offset in (0..3200).rev() {
+        if let Some(ht) =
+            checkpoint.min_height_in_range((checkpoint.max_height() - offset).unwrap()..)
+        {
+            proband_heights.insert(ht);
+        }
+    }
+    let mut proband_heights_vec = Vec::from_iter(proband_heights);
+    proband_heights_vec.sort();
+    for proband_height in proband_heights_vec.iter().rev().take(2) {
+        if let Some(hash) = checkpoint.hash(*proband_height) {
+            proband_hashes.insert(hash);
+            println!(
+                "preparing proband hashes...height {:?} has hash {:?}",
+                proband_height, hash
+            );
+        }
+    }
+    proband_hashes
+});
+
+
 // , tcp_timeout: Duration, protocol_timeout: Duration
 
 async fn test_a_server(
@@ -214,6 +241,11 @@ async fn test_a_server(
     );
     let connection = timeout(connection_timeout, connection);
     let connection = connection.await;
+
+    let hash_checkpoints = match network {
+        Network::Mainnet => HASH_CHECKPOINTS_MAINNET.clone(),
+        Network::Testnet => HASH_CHECKPOINTS_TESTNET.clone()
+    };
 
     match connection {
         Err(timeout_error) => {
@@ -264,7 +296,7 @@ async fn test_a_server(
                     // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
 
                     let hash_query_response = good_connection
-                        .call(Request::BlocksByHash(HASH_CHECKPOINTS.clone()))
+                        .call(Request::BlocksByHash(hash_checkpoints.clone()))
                         .await;
                     //println!("hash query response is {:?}", hash_query_response);
                     match hash_query_response {
@@ -284,9 +316,9 @@ async fn test_a_server(
                                     }
                                     //println!("{:?}", returned_hashes);
                                     let intersection_count =
-                                        returned_hashes.intersection(&HASH_CHECKPOINTS).count();
+                                        returned_hashes.intersection(&hash_checkpoints).count();
                                     // println!("intersection_count is {:?}", intersection_count);
-                                    if intersection_count == HASH_CHECKPOINTS.len() {
+                                    if intersection_count == hash_checkpoints.len() {
                                         // All requested blocks are there and hash OK
                                         println!("Peer {:?} returned good hashes", peer_addr);
                                         return PollStatus::BlockRequestOK(peer_derived_data);
