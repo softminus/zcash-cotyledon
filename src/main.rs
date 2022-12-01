@@ -712,8 +712,8 @@ async fn main() {
         match mode {
             CrawlingMode::FastAcquisition => {
                 let timeouts = Timeouts {
-                    peers_timeout: Duration::from_secs(4),
-                    hash_timeout: Duration::from_secs(4),
+                    peers_timeout: Duration::from_secs(32),
+                    hash_timeout: Duration::from_secs(32),
                 };
                 fast_walker(
                     &serving_nodes_shared,
@@ -731,8 +731,8 @@ async fn main() {
             }
             CrawlingMode::LongTermUpdates => {
                 let timeouts = Timeouts {
-                    peers_timeout: Duration::from_secs(16),
-                    hash_timeout: Duration::from_secs(16),
+                    peers_timeout: Duration::from_secs(32),
+                    hash_timeout: Duration::from_secs(32),
                 };
                 slow_walker(
                     &serving_nodes_shared,
