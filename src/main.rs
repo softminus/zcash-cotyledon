@@ -199,6 +199,16 @@ static HASH_CHECKPOINTS_MAINNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     proband_hashes
 });
 
+static REQUIRED_MAINNET_HEIGHT: LazyLock<Height> = LazyLock::new(|| {
+    let checkpoint = CheckpointList::new(Network::Mainnet);
+    checkpoint.max_height()
+});
+
+static REQUIRED_TESTNET_HEIGHT: LazyLock<Height> = LazyLock::new(|| {
+    let checkpoint = CheckpointList::new(Network::Testnet);
+    checkpoint.max_height()
+});
+
 
 static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     let checkpoint = CheckpointList::new(Network::Testnet);
@@ -634,8 +644,8 @@ fn get_classification(
 
 fn required_height(network: Network) -> Height {
     match network {
-        Network::Mainnet => Height(1759558),
-        Network::Testnet => Height(1982923),
+        Network::Mainnet => *REQUIRED_MAINNET_HEIGHT,
+        Network::Testnet => *REQUIRED_TESTNET_HEIGHT,
     }
 }
 
