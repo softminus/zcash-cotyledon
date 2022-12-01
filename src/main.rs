@@ -819,7 +819,7 @@ async fn probe_and_update(
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
-) -> (SocketAddr, Option<(PeerStats, Vec<SocketAddr>)>) {
+) -> (SocketAddr, Option<PeerStats>) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
         None => PeerStats {
@@ -832,17 +832,9 @@ async fn probe_and_update(
         },
         Some(old_stats) => old_stats.clone(),
     };
-    let mut found_peer_addresses = Vec::new();
     sleep(random_delay).await;
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let poll_res = test_a_server(proband_address, network, timeouts.hash_timeout).await;
-    let peers_res = probe_for_peers(proband_address, network, timeouts.peers_timeout).await;
-    if let Some(peer_list) = peers_res {
-        for peer in peer_list {
-            found_peer_addresses.push(peer.addr());
-        }
-        //println!("found new peers: {:?}", found_peer_addresses);
-    }
     //println!("result = {:?}", poll_res);
     new_peer_stats.total_attempts += 1;
     match poll_res {
@@ -882,7 +874,7 @@ async fn probe_and_update(
     new_peer_stats.last_polled = Some(current_poll_time);
     return (
         proband_address,
-        Some((new_peer_stats, found_peer_addresses)),
+        Some(new_peer_stats),
     );
 }
 
@@ -915,16 +907,19 @@ async fn slow_walker(
     let mut stream = futures::stream::iter(batch_queries).buffer_unordered(max_inflight_conn);
     while let Some(probe_result) = stream.next().await {
         let peer_address = probe_result.0;
-        if let Some((new_peer_stat, new_peers)) = probe_result.1 {
+        if let Some(new_peer_stat) = probe_result.1 {
             println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
             //println!("new peers: {:?}", new_peers);
             let new_peer_stat = new_peer_stat.clone();
             internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
             single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
-            for peer in new_peers {
-                let key = peer.to_socket_addrs().unwrap().next().unwrap();
-                if !internal_peer_tracker.contains_key(&key) {
-                    internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+            let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
+            if let Some(peer_list) = peers_res {
+                for peer in peer_list {
+                    let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
+                    if !internal_peer_tracker.contains_key(&key) {
+                        internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+                    }
                 }
             }
             println!("HashMap len: {:?}", internal_peer_tracker.len());
@@ -953,23 +948,27 @@ async fn fast_walker(
     }
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
-        if let Some((new_peer_stat, new_peers)) = probe_result.1 {
+        if let Some(new_peer_stat) = probe_result.1 {
             println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
             //println!("new peers: {:?}", new_peers);
             let new_peer_stat = new_peer_stat.clone();
             internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
             single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
-            for peer in new_peers {
-                let key = peer.to_socket_addrs().unwrap().next().unwrap();
-                if !internal_peer_tracker.contains_key(&key) {
-                    internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                    handles.push(probe_and_update(
-                        key.clone(),
-                        <Option<PeerStats>>::None,
-                        network,
-                        &timeouts,
-                        Duration::from_secs(rng.gen_range(0..256)),
-                    ));
+            
+            let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
+            if let Some(peer_list) = peers_res {
+                for peer in peer_list {
+                    let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
+                    if !internal_peer_tracker.contains_key(&key) {
+                        internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+                        handles.push(probe_and_update(
+                            key.clone(),
+                            <Option<PeerStats>>::None,
+                            network,
+                            &timeouts,
+                            Duration::from_secs(rng.gen_range(0..256)),
+                        ));
+                    }
                 }
             }
             println!("HashMap len: {:?}", internal_peer_tracker.len());
