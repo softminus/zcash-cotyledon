@@ -722,8 +722,11 @@ async fn main() {
                     timeouts,
                 )
                 .await;
-                if internal_peer_tracker.len() > 1024 {
-                    mode = CrawlingMode::LongTermUpdates;
+                {
+                    let serving_nodes_testing = serving_nodes_shared.read().unwrap();
+                    if serving_nodes_testing.primaries.len() + serving_nodes_testing.alternates.len() > 32 {
+                        mode = CrawlingMode::LongTermUpdates;
+                    }
                 }
             }
             CrawlingMode::LongTermUpdates => {
