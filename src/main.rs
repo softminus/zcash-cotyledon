@@ -112,8 +112,7 @@ impl DnsContext {
             return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::ServFail)).await.unwrap());
         }
         let endpoint = dnsrr::LowerName::from(dnsrr::Name::from_str("dnsseed.z.cash").unwrap());
-        println!("name is {:?}", *request.query().name() == endpoint);
-        if !endpoint.zone_of(request.query().name()) {
+        if *request.query().name() != endpoint {
             let response = MessageResponseBuilder::from_message_request(request);
             return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::NXDomain)).await.unwrap());
         }
