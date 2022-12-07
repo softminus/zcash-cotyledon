@@ -951,13 +951,14 @@ async fn fast_walker(
     let mut handles = FuturesUnordered::new();
     let mut rng = rand::thread_rng();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        handles.push(probe_and_update(
+        handles.push(Box::pin(probe_and_update(
             proband_address.clone(),
             peer_stat.clone(),
             network,
             &timeouts,
-            Duration::from_secs(rng.gen_range(0..1)),
-        ));
+            Duration::from_secs(rng.gen_range(0..1))),
+        ) as Pin<Box<dyn Future<Output = (SocketAddr, PeerProbeResult)>>>);
+        handles.push(Box::pin(probe_for_peers(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
     }
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
