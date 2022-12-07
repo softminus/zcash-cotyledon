@@ -426,14 +426,6 @@ struct EWMAState {
     reliability: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum PeerClassification {
-    AllGood, // Node meets all the legacy criteria (including uptime), and is fully servable to clients
-    MerelySyncedEnough, // Node recently could serve us a recent-enough block (it is syncing or has synced to zcash chain)
-    // but doesn't meet uptime criteria.
-    Bad,           // Node is bad for some reason, but we could connect to it
-    BeyondUseless, // We tried, but weren't even able to negotiate a connection
-    Unknown,       // We got told about this node but haven't yet queried it
 }
 
 #[derive(Debug, Clone)]
@@ -445,6 +437,16 @@ struct PeerStats {
     last_success: Option<SystemTime>,
 
     peer_derived_data: Option<PeerDerivedData>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PeerClassification {
+    AllGood,               // Node meets all the legacy criteria (including uptime), can serve a recent-enough block
+    MerelySyncedEnough,    // In the past 2 hours, this node served us a recent-enough block (synced-enough to the zcash chain) but doesn't meet uptime criteria
+    EventuallyMaybeSynced, // This looks like it could be a good node once it's synced enough, so poll it more often so it graduates earlier
+    NetworkBad,            // Unable to establish a TCP connection to determine what's up with this host
+    BeyondUseless,         // We established a TCP connection, but protocol negotation has never worked. This isn't a Zcash or Zebra node
+    Unknown,               // We got told about this node but haven't yet queried it
 }
 
 #[derive(Debug, Clone, Default)]
