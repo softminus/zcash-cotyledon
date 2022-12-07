@@ -522,20 +522,8 @@ fn get_classification(
     }
 
     if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
-        if !peer_derived_data
-            .peer_services
-            .intersects(PeerServices::NODE_NETWORK)
-        {
-            return PeerClassification::GenericBad;
-        }
 
-        if peer_derived_data.numeric_version < required_serving_version(network) {
-            return PeerClassification::GenericBad;
-        }
 
-        if peer_derived_data.peer_height < required_height(network) {
-            return PeerClassification::GenericBad;
-        }
 
         // AllGood test section
         let ewmas = peer_stats.ewma_pack;
