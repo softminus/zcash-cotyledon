@@ -756,6 +756,8 @@ async fn main() {
                         mode = CrawlingMode::LongTermUpdates;
                     }
                 }
+                println!("FAST WALKER iteration done");
+                sleep(Duration::new(8, 0)).await;
             }
             CrawlingMode::LongTermUpdates => {
                 let timeouts = Timeouts {
@@ -774,8 +776,6 @@ async fn main() {
         }
         // just in case...we could add code to check if this does anything to find bugs with the incremental update
         update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
-        sleep(Duration::new(2, 0)).await;
-        println!("done with getting results");
     }
 }
 
