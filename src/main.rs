@@ -543,7 +543,6 @@ fn get_classification(
         {
             return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
-
         if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0 {
             return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
@@ -559,6 +558,8 @@ fn get_classification(
         if ewmas.stat_1month.reliability > 0.35 && ewmas.stat_1month.count > 32.0 {
             return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
+
+
         // MerelySyncedEnough test section
         // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
         if let Some(last_success) = peer_stats.last_success {
