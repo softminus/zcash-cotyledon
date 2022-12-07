@@ -961,41 +961,57 @@ async fn fast_walker(
         handles.push(Box::pin(probe_for_peers(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
     }
     while let Some(probe_result) = handles.next().await {
+        println!("XXXXXXXXXXXXXXXXXXXXXXXX {:?}", probe_result);
         let peer_address = probe_result.0;
-        if let Some(new_peer_stat) = probe_result.1 {
-            println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
-            //println!("new peers: {:?}", new_peers);
-            let new_peer_stat = new_peer_stat.clone();
-            internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
-            single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
-            println!("HashMap len: {:?}", internal_peer_tracker.len());
-        } else {
-            // we gotta retry
-            println!("RETRYING {:?}", peer_address);
-            handles.push(probe_and_update(
-                peer_address.clone(),
-                internal_peer_tracker[&peer_address].clone(),
-                network,
-                &timeouts,
-                Duration::from_secs(rng.gen_range(0..1)),
-            ))
+        match probe_result.1 {
+            HashResult(new_peer_stats) => {
+
+            },
+            MustRetryHashResult => {
+
+            },
+            PeersResult(new_peers) => {
+
+            },
+            FailedPeerPoll => {
+                
+            },
         }
+        // if let Some(new_peer_stat) = probe_result.1 {
+        //     println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
+        //     //println!("new peers: {:?}", new_peers);
+        //     let new_peer_stat = new_peer_stat.clone();
+        //     internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
+        //     single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
+        //     println!("HashMap len: {:?}", internal_peer_tracker.len());
+        // } else {
+        //     // we gotta retry
+        //     println!("RETRYING {:?}", peer_address);
+        //     handles.push(probe_and_update(
+        //         peer_address.clone(),
+        //         internal_peer_tracker[&peer_address].clone(),
+        //         network,
+        //         &timeouts,
+        //         Duration::from_secs(rng.gen_range(0..1)),
+        //     ));
+        //     handles.push(probe_for_peers(peer_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1))));
+
+        // }
         // this needs to be pushed into the work queue, not executed like this
-        let peers_res = probe_for_peers(peer_address, network, timeouts.peers_timeout).await;
-        if let Some(peer_list) = peers_res {
-            for peer in peer_list {
-                let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
-                if !internal_peer_tracker.contains_key(&key) {
-                    internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                    handles.push(probe_and_update(
-                        key.clone(),
-                        <Option<PeerStats>>::None,
-                        network,
-                        &timeouts,
-                        Duration::from_secs(rng.gen_range(0..1)),
-                    ));
-                }
-            }
-        }
+        // if let Some(peer_list) = peers_res {
+        //     for peer in peer_list {
+        //         let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
+        //         if !internal_peer_tracker.contains_key(&key) {
+        //             internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+        //             handles.push(probe_and_update(
+        //                 key.clone(),
+        //                 <Option<PeerStats>>::None,
+        //                 network,
+        //                 &timeouts,
+        //                 Duration::from_secs(rng.gen_range(0..1)),
+        //             ));
+        //         }
+        //     }
+        // }
     }
 }
