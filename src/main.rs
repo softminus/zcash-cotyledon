@@ -994,7 +994,7 @@ async fn fast_walker(
             },
             ProbeResult::MustRetryHashResult => {
                 // we gotta retry
-                println!("RETRYING {:?}", peer_address);
+                println!("Retrying hash probe for {:?}", peer_address);
                 handles.push(Box::pin(hash_probe_and_update(
                     peer_address.clone(),
                     internal_peer_tracker[&peer_address].clone(),
@@ -1007,6 +1007,7 @@ async fn fast_walker(
                 for peer in new_peers {
                     let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
                     if !internal_peer_tracker.contains_key(&key) {
+                        println!("Probing {:?} yielded new peer {:?}, adding to work queue", peer_address, key);
                         internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
                         handles.push(Box::pin(hash_probe_and_update(
                             key.clone(),
@@ -1023,6 +1024,7 @@ async fn fast_walker(
                 println!("probing {:?} for peers failed, not retrying", peer_address);
             },
             ProbeResult::MustRetryPeersResult => {
+                println!("Retrying peers probe for {:?}", peer_address);
                 handles.push(Box::pin(probe_for_peers_two(peer_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
             },
         }
