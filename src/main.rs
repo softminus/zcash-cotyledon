@@ -464,6 +464,34 @@ enum PeerClassification {
 }
 
 
+fn ancillary_checks_all_good(peer_derived_data: &PeerDerivedData, network: Network) -> PeerClassification {
+    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) |
+            peer_derived_data.numeric_version < required_serving_version(network) |
+            peer_derived_data.peer_height < required_height(network)
+    {
+        return PeerClassification::GenericBad;
+    } else {
+        return PeerClassification::AllGood;
+    }
+}
+
+fn ancillary_checks_merely_synced(peer_derived_data: &PeerDerivedData, network: Network) -> PeerClassification {
+    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) |
+            peer_derived_data.numeric_version < required_serving_version(network) |
+            peer_derived_data.peer_height < required_height(network)
+    {
+        return PeerClassification::GenericBad;
+    } else {
+        return PeerClassification::MerelySyncedEnough;
+    }
+}
+
+
+// long term goal: add config options that look like:
+// all_good_tests = numeric_version | peer_height
+// merely_synced_enough_tests = numeric_version | peer_height
+// to allow operator to customize tests should they become tetchy (also if we want to be extra we could disable the hash test to revert the seeder to the legacy behavior)
+
 fn get_classification(
     peer_stats: &Option<PeerStats>,
     peer_address: &SocketAddr,
