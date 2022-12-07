@@ -458,7 +458,6 @@ enum PeerClassification {
     Unknown,               // We got told about this node but haven't yet queried it
     BeyondUseless,         // We established a TCP connection, but protocol negotation has never worked. This probably isn't a Zcash or Zebra node.
     GenericBad,            // We were able to establish a TCP connection, and the host is bad for a reason that doesn't make it BeyondUseless
-    NetworkBad,            // Unable to establish a TCP connection to determine what's up with this host
     EventuallyMaybeSynced, // This looks like it could be a good node once it's synced enough, so poll it more often so it graduates earlier
     MerelySyncedEnough,    // In the past 2 hours, this node served us a recent-enough block (synced-enough to the zcash chain) but doesn't meet uptime criteria
     AllGood,               // Node meets all the legacy criteria (including uptime), can serve a recent-enough block
@@ -485,25 +484,25 @@ fn get_classification(
             // at least 10 TCP connections, but never been able to negotiate the Zcash protocol
             return PeerClassification::BeyondUseless;
         } else {
-            return PeerClassification::NetworkBad; // need more samples before hitting it with the worst possible penalty
+            return PeerClassification::GenericBad; // need more samples before hitting it with the worst possible penalty
         }
     }
 
-    let peer_derived_data = peer_stats.peer_derived_data.as_ref().unwrap();
+    let peer_derived_data = peer_stats.peer_derived_data.as_ref().unwrap(); // the previous if means this isn't a None
 
     if !peer_derived_data
         .peer_services
         .intersects(PeerServices::NODE_NETWORK)
     {
-        return PeerClassification::Bad;
+        return PeerClassification::GenericBad;
     }
 
     if peer_derived_data.numeric_version < required_serving_version(network) {
-        return PeerClassification::Bad;
+        return PeerClassification::GenericBad;
     }
 
     if peer_derived_data.peer_height < required_height(network) {
-        return PeerClassification::Bad;
+        return PeerClassification::GenericBad;
     }
 
     let ewmas = peer_stats.ewma_pack;
