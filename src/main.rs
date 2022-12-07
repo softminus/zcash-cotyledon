@@ -1038,7 +1038,15 @@ async fn fast_walker(
                 println!("HashMap len: {:?}", internal_peer_tracker.len());
             },
             PeerProbeResult::MustRetryHashResult => {
-
+                // we gotta retry
+                println!("RETRYING {:?}", peer_address);
+                handles.push(Box::pin(probe_and_update(
+                    peer_address.clone(),
+                    internal_peer_tracker[&peer_address].clone(),
+                    network,
+                    &timeouts,
+                    Duration::from_secs(rng.gen_range(0..1)),
+                )));
             },
             PeerProbeResult::PeersResult(new_peers) => {
 
@@ -1052,16 +1060,6 @@ async fn fast_walker(
         }
 
         // } else {
-        //     // we gotta retry
-        //     println!("RETRYING {:?}", peer_address);
-        //     handles.push(probe_and_update(
-        //         peer_address.clone(),
-        //         internal_peer_tracker[&peer_address].clone(),
-        //         network,
-        //         &timeouts,
-        //         Duration::from_secs(rng.gen_range(0..1)),
-        //     ));
-        //     handles.push(probe_for_peers(peer_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1))));
 
         // }
         // this needs to be pushed into the work queue, not executed like this
