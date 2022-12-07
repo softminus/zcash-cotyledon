@@ -455,13 +455,13 @@ struct PeerStats {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PeerClassification {
-    AllGood,               // Node meets all the legacy criteria (including uptime), can serve a recent-enough block
-    MerelySyncedEnough,    // In the past 2 hours, this node served us a recent-enough block (synced-enough to the zcash chain) but doesn't meet uptime criteria
-    EventuallyMaybeSynced, // This looks like it could be a good node once it's synced enough, so poll it more often so it graduates earlier
-    NetworkBad,            // Unable to establish a TCP connection to determine what's up with this host
-    GenericBad,            // We were able to establish a TCP connection, and the host is bad for a reason that doesn't make it BeyondUseless
-    BeyondUseless,         // We established a TCP connection, but protocol negotation has never worked. This probably isn't a Zcash or Zebra node.
     Unknown,               // We got told about this node but haven't yet queried it
+    BeyondUseless,         // We established a TCP connection, but protocol negotation has never worked. This probably isn't a Zcash or Zebra node.
+    GenericBad,            // We were able to establish a TCP connection, and the host is bad for a reason that doesn't make it BeyondUseless
+    NetworkBad,            // Unable to establish a TCP connection to determine what's up with this host
+    EventuallyMaybeSynced, // This looks like it could be a good node once it's synced enough, so poll it more often so it graduates earlier
+    MerelySyncedEnough,    // In the past 2 hours, this node served us a recent-enough block (synced-enough to the zcash chain) but doesn't meet uptime criteria
+    AllGood,               // Node meets all the legacy criteria (including uptime), can serve a recent-enough block
 }
 
 
