@@ -1026,7 +1026,7 @@ async fn fast_walker(
             &timeouts,
             Duration::from_secs(rng.gen_range(0..1))),
         ) as Pin<Box<dyn Future<Output = (SocketAddr, PeerProbeResult)>>>);
-        handles.push(Box::pin(probe_for_peers(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
+        handles.push(Box::pin(probe_for_peers_two(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
     }
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
@@ -1049,7 +1049,20 @@ async fn fast_walker(
                 )));
             },
             PeerProbeResult::PeersResult(new_peers) => {
-
+                for peer in new_peers {
+                    let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
+                    if !internal_peer_tracker.contains_key(&key) {
+                        internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+                        handles.push(Box::pin(probe_and_update(
+                            key.clone(),
+                            <Option<PeerStats>>::None,
+                            network,
+                            &timeouts,
+                            Duration::from_secs(rng.gen_range(0..1)),
+                        )));
+                        handles.push(Box::pin(probe_for_peers_two(key.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
+                    }
+                }
             },
             PeerProbeResult::PeersFail => {
 
@@ -1059,24 +1072,7 @@ async fn fast_walker(
             },
         }
 
-        // } else {
+       
 
-        // }
-        // this needs to be pushed into the work queue, not executed like this
-        // if let Some(peer_list) = peers_res {
-        //     for peer in peer_list {
-        //         let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
-        //         if !internal_peer_tracker.contains_key(&key) {
-        //             internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-        //             handles.push(probe_and_update(
-        //                 key.clone(),
-        //                 <Option<PeerStats>>::None,
-        //                 network,
-        //                 &timeouts,
-        //                 Duration::from_secs(rng.gen_range(0..1)),
-        //             ));
-        //         }
-        //     }
-        // }
     }
 }
