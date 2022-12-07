@@ -914,57 +914,65 @@ async fn hash_probe_and_update(
     return (proband_address, ProbeResult::HashResult(new_peer_stats));
 }
 
-// async fn slow_walker(
-//     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
-//     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
-//     network: Network,
-//     max_inflight_conn: usize,
-//     timeouts: Timeouts,
-// ) {
-//     let mut rng = rand::thread_rng();
-//     let mut batch_queries = Vec::new();
-//     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-//         if poll_this_time_around(peer_stat, proband_address, network) {
-//             batch_queries.push(probe_and_update(
-//                 proband_address.clone(),
-//                 peer_stat.clone(),
-//                 network,
-//                 &timeouts,
-//                 Duration::from_secs(rng.gen_range(0..256)),
-//             ));
-//             batch_queries.push(probe_for_peers(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..256))));
-//         } else {
-//             println!(
-//                 "NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY",
-//                 proband_address
-//             );
-//         }
-//     }
+async fn slow_walker(
+    serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+    internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
+    network: Network,
+    max_inflight_conn: usize,
+    timeouts: Timeouts,
+) {
+    let mut rng = rand::thread_rng();
+    let mut batch_queries = Vec::new();
+    for (proband_address, peer_stat) in internal_peer_tracker.iter() {
+        if poll_this_time_around(peer_stat, proband_address, network) {
+            batch_queries.push(Box::pin(hash_probe_and_update(
+            proband_address.clone(),
+            peer_stat.clone(),
+            network,
+            &timeouts,
+            Duration::from_secs(rng.gen_range(0..256))),
+                ) as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
+            batch_queries.push(Box::pin(probe_for_peers_two(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..256)))))
+        } else {
+            println!(
+                "NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY",
+                proband_address
+            );
+        }
+    }
 
-//     let mut stream = futures::stream::iter(batch_queries).buffer_unordered(max_inflight_conn);
-//     while let Some(probe_result) = stream.next().await {
-//         let peer_address = probe_result.0;
-//         if let Some(new_peer_stat) = probe_result.1 {
-//             println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
-//             //println!("new peers: {:?}", new_peers);
-//             let new_peer_stat = new_peer_stat.clone();
-//             internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
-//             single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
-//             println!("HashMap len: {:?}", internal_peer_tracker.len());
-//         } else {
-//             println!("SLOW WALKER MUST RETRY {:?} NEXT TIME AROUND", peer_address);
-//         }
-//         // this needs to be pushed into the work queue, not executed like this
-//         if let Some(peer_list) = peers_res {
-//             for peer in peer_list {
-//                 let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
-//                 if !internal_peer_tracker.contains_key(&key) {
-//                     internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-//                 }
-//             }
-//         }
-//     }
-// }
+    let mut stream = futures::stream::iter(batch_queries).buffer_unordered(max_inflight_conn);
+    while let Some(probe_result) = stream.next().await {
+        let peer_address = probe_result.0;
+
+        match probe_result.1 {
+            ProbeResult::HashResult(new_peer_stat) => {
+                println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
+                internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
+                single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat.clone()));
+                println!("HashMap len: {:?}", internal_peer_tracker.len());
+            },
+            ProbeResult::MustRetryHashResult => {
+                println!("Slow Walker probing {:?} for hashes failed due to too many open sockets, this should NOT HAPPEN", peer_address);
+            },
+            ProbeResult::PeersResult(new_peers) => {
+                for peer in new_peers {
+                    let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
+                    if !internal_peer_tracker.contains_key(&key) {
+                        println!("Slow Walker Probing {:?} yielded new peer {:?}, adding to peer tracker", peer_address, key);
+                        internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+                    }
+                }
+            },
+            ProbeResult::PeersFail => {
+                println!("Slow Walker probing {:?} for peers failed, will be retried next time around", peer_address);
+            },
+            ProbeResult::MustRetryPeersResult => {
+                println!("Slow Walker probing {:?} for peers failed due to too many open sockets, this should NOT HAPPEN", peer_address);
+            },
+        }
+    }
+}
 
 
 async fn fast_walker(
@@ -1030,8 +1038,6 @@ async fn fast_walker(
                 handles.push(Box::pin(probe_for_peers_two(peer_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
             },
         }
-
-       
 
     }
 }
