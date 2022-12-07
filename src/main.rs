@@ -351,6 +351,73 @@ async fn test_a_server(
     }
 }
 
+
+
+async fn probe_for_peers_two(
+    peer_addr: SocketAddr,
+    network: Network,
+    timeouts: &Timeouts,
+    random_delay: Duration,
+) -> (SocketAddr, PeerProbeResult) {
+    println!("Starting peer probe connection: peer addr is {:?}", peer_addr);
+    let connection = connect_isolated_tcp_direct(
+        network,
+        peer_addr,
+        String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
+    );
+    let connection = timeout(timeouts.peers_timeout, connection);
+    let connection = connection.await;
+
+    match connection {
+        Err(timeout_error) => {
+            println!(
+                "Probe connection with {:?} TIMED OUT: {:?}",
+                peer_addr, timeout_error
+            );
+            return (peer_addr, PeerProbeResult::PeersFail);
+        }
+        Ok(connection_might_have_failed) => {
+            match connection_might_have_failed {
+                Err(connection_failure) => {
+                    println!(
+                        "Connection with {:?} failed: {:?}",
+                        peer_addr, connection_failure
+                    );
+                    if let Some(decanisterized_error) =
+                        connection_failure.downcast_ref::<std::io::Error>()
+                    {
+                        println!(
+                            "IO error detected... decannisterizing: error = {:?}, test={:?}",
+                            decanisterized_error,
+                            decanisterized_error.kind() == std::io::ErrorKind::Uncategorized
+                        );
+                        // Connection with XXX.XXX.XXX.XXX:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
+                        if decanisterized_error.kind() == std::io::ErrorKind::Uncategorized {
+                            // probably an EMFILES / ENFILES
+                            return (peer_addr, PeerProbeResult::MustRetryPeersResult);
+                        }
+                    }
+                    return (peer_addr, PeerProbeResult::PeersFail);
+                }
+                Ok(mut good_connection) => {
+                    for _attempt in 0..2 {
+                        let peers_query_response = good_connection
+                            .call(Request::Peers)
+                            .await;
+                        if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = peers_query_response {
+                            if candidate_peers.len() > 1 {
+                                return (peer_addr, PeerProbeResult::PeersResult(candidate_peers.to_vec()));
+                            }
+                        }
+                    }
+                    return (peer_addr, PeerProbeResult::PeersFail);
+                }
+            }
+        }
+    }
+}
+
+
 async fn probe_for_peers(
     peer_addr: SocketAddr,
     network: Network,
