@@ -356,7 +356,7 @@ async fn probe_for_peers(
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
-) -> (SocketAddr, Option<PeerProbeResult>) {
+) -> (SocketAddr, PeerProbeResult) {
     sleep(random_delay).await;
     println!("Starting peer probe connection: peer addr is {:?}", peer_addr);
     let the_connection = connect_isolated_tcp_direct(
@@ -369,27 +369,27 @@ async fn probe_for_peers(
     if let Ok(x) = x {
         match x {
             Ok(mut z) => {
-                let mut peers_vec: Option<Vec<MetaAddr>> = None;
+                let mut peers_vec: Vec<MetaAddr> = Vec::new();
                 for _attempt in 0..2 {
                     let resp = z.call(Request::Peers).await;
                     if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = resp {
                         if candidate_peers.len() > 1 {
-                            peers_vec = Some(candidate_peers.to_vec());
+                            peers_vec = candidate_peers.to_vec();
                             //println!("{:?}", peers_vec);
                             break;
                         }
                     }
                 }
-                return (peer_addr, Some(PeerProbeResult::PeersResult(peers_vec)));
+                return (peer_addr, PeerProbeResult::PeersResult(peers_vec));
             } // ok connect
             Err(error) => {
                 println!("Peers connection with {:?} failed: {:?}", peer_addr, error);
-                return (peer_addr, None);
+                return (peer_addr, PeerProbeResult::FailedPeerPoll);
             }
         };
     } else {
         println!("Peers connection with {:?} TIMED OUT: {:?}", peer_addr, x);
-        (peer_addr, None)
+        (peer_addr, PeerProbeResult::FailedPeerPoll)
     }
 }
 
@@ -823,7 +823,9 @@ struct Timeouts {
 #[derive(Debug, Clone)]
 enum PeerProbeResult {
     HashResult(PeerStats),
-    PeersResult(Option<Vec<MetaAddr>>)
+    MustRetryHashResult,
+    PeersResult(Vec<MetaAddr>),
+    FailedPeerPoll
 }
 async fn probe_and_update(
     proband_address: SocketAddr,
@@ -831,7 +833,7 @@ async fn probe_and_update(
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
-) -> (SocketAddr, Option<PeerProbeResult>) {
+) -> (SocketAddr, PeerProbeResult) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
         None => PeerStats {
@@ -852,7 +854,7 @@ async fn probe_and_update(
     match poll_res {
         PollStatus::RetryConnection() => {
             println!("Retry the connection!");
-            return (proband_address, None);
+            return (proband_address, PeerProbeResult::MustRetryHashResult);
         }
         PollStatus::BlockRequestOK(new_peer_data) => {
             new_peer_stats.total_successes += 1;
@@ -884,11 +886,9 @@ async fn probe_and_update(
         }
     }
     new_peer_stats.last_polled = Some(current_poll_time);
-    return (
-        proband_address,
-        Some(PeerProbeResult::HashResult(new_peer_stats)),
-    );
+    return (proband_address, PeerProbeResult::HashResult(new_peer_stats));
 }
+
 // async fn slow_walker(
 //     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
 //     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
