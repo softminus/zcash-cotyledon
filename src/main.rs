@@ -111,7 +111,7 @@ impl DnsContext {
             let response = MessageResponseBuilder::from_message_request(request);
             return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::ServFail)).await.unwrap());
         }
-        let endpoint = dnsrr::LowerName::from(dnsrr::Name::from_str("dnsseed.z.cash").unwrap());
+        let endpoint = dnsrr::LowerName::from(dnsrr::Name::from_str("mainnet-test-seed.electriccoin.co").unwrap()); // make me configurable
         if *request.query().name() != endpoint {
             let response = MessageResponseBuilder::from_message_request(request);
             return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::NXDomain)).await.unwrap());
@@ -684,7 +684,7 @@ async fn main() {
     let seedfeed = SeedContext {
         serving_nodes_shared: serving_nodes_shared.clone(),
     };
-    let addr = "127.0.0.1:50051".parse().unwrap();
+    let addr = "127.0.0.1:50051".parse().unwrap(); // make me configurable
     let seeder_service = Server::builder()
         .add_service(SeederServer::new(seedfeed))
         .serve(addr);
@@ -695,7 +695,7 @@ async fn main() {
         serving_network: Network::Mainnet,
     };
     let mut dns_server = trust_dns_server::ServerFuture::new(dns_handler);
-    let dns_socket = "127.0.0.1:5300".to_socket_addrs().unwrap().next().unwrap();
+    let dns_socket = "127.0.0.1:5300".to_socket_addrs().unwrap().next().unwrap(); // make me configurable
     dns_server.register_socket(UdpSocket::bind(dns_socket).await.unwrap());
     tokio::spawn(dns_server.block_until_done());
 
