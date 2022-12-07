@@ -569,6 +569,14 @@ fn get_classification(
                 }
             }
         }
+
+
+        // EventuallyMaybeSynced test section
+        // if last protocol negotiation was more than 24 hours ago, this is not worth special attention, keep polling it at the slower rate
+        if let Some(last_protocol_negotiation) = peer_stats.last_protocol_negotiation {
+            if let Ok(duration) = last_protocol_negotiation.elapsed() {
+                if duration <= Duration::from_secs(60 * 60 * 24) {
+                    return ancillary_checks_eventually_maybe_synced(peer_derived_data, peer_address, peer_stats, network);
                 }
             }
         }
