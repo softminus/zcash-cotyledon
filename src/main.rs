@@ -443,7 +443,9 @@ enum BlockProbeResult {
 #[derive(Debug, Clone)]
 struct PeerStats {
     total_attempts: u64,
-    total_successes: u64,
+    tcp_connections_ok: u64,
+    protocol_negotations_ok: u64,
+    valid_block_reply_ok: u64,
     ewma_pack: EWMAPack,
     last_polled: Option<SystemTime>,
     last_success: Option<SystemTime>,
@@ -651,7 +653,7 @@ fn get_classification(
         return PeerClassification::Bad;
     }
     let ewmas = peer_stats.ewma_pack;
-    if peer_stats.total_attempts <= 3 && peer_stats.total_successes * 2 >= peer_stats.total_attempts
+    if peer_stats.total_attempts <= 3 && peer_stats.valid_block_reply_ok * 2 >= peer_stats.total_attempts
     {
         return PeerClassification::AllGood;
     };
@@ -877,7 +879,8 @@ async fn hash_probe_and_update(
     let mut new_peer_stats = match old_stats {
         None => PeerStats {
             total_attempts: 0,
-            total_successes: 0,
+            protocol_negotiation_failures: 0,
+            total_hash_successes: 0,
             ewma_pack: EWMAPack::default(),
             last_polled: None,
             last_success: None,
