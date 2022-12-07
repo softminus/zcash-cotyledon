@@ -448,7 +448,8 @@ struct PeerStats {
     valid_block_reply_ok: u64,
     ewma_pack: EWMAPack,
     last_polled: Option<SystemTime>,
-    last_success: Option<SystemTime>,
+    last_protocol_negotiation: Option<SystemTime>,
+    last_block_success: Option<SystemTime>,
 
     peer_derived_data: Option<PeerDerivedData>,
 }
