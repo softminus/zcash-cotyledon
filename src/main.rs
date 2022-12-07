@@ -464,6 +464,84 @@ enum PeerClassification {
     Unknown,               // We got told about this node but haven't yet queried it
 }
 
+
+fn get_classification(
+    peer_stats: &Option<PeerStats>,
+    peer_address: &SocketAddr,
+    network: Network,
+) -> PeerClassification {
+    let peer_stats = match peer_stats {
+        None => return PeerClassification::Unknown,
+        Some(peer_stats) => peer_stats,
+    };
+
+    if peer_stats.total_attempts == 0 {
+        // we never attempted to connect to this peer
+        return PeerClassification::Unknown;
+    }
+
+    if peer_stats.peer_derived_data.is_none() {
+        if peer_stats.tcp_connections_ok > 10 &  {
+            // at least 10 TCP connections, but never been able to negotiate the Zcash protocol
+            return PeerClassification::BeyondUseless;
+        } else {
+            return PeerClassification::NetworkBad; // need more samples before hitting it with the worst possible penalty
+        }
+    }
+
+    let peer_derived_data = peer_stats.peer_derived_data.as_ref().unwrap();
+
+    if !peer_derived_data
+        .peer_services
+        .intersects(PeerServices::NODE_NETWORK)
+    {
+        return PeerClassification::Bad;
+    }
+
+    if peer_derived_data.numeric_version < required_serving_version(network) {
+        return PeerClassification::Bad;
+    }
+
+    if peer_derived_data.peer_height < required_height(network) {
+        return PeerClassification::Bad;
+    }
+
+    if !peer_address.ip().is_global() {
+        return PeerClassification::Bad;
+    }
+    let ewmas = peer_stats.ewma_pack;
+    if peer_stats.total_attempts <= 3 && peer_stats.valid_block_reply_ok * 2 >= peer_stats.total_attempts
+    {
+        return PeerClassification::AllGood;
+    };
+
+    if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0 {
+        return PeerClassification::AllGood;
+    };
+    if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0 {
+        return PeerClassification::AllGood;
+    };
+    if ewmas.stat_1day.reliability > 0.55 && ewmas.stat_1day.count > 8.0 {
+        return PeerClassification::AllGood;
+    };
+    if ewmas.stat_1week.reliability > 0.45 && ewmas.stat_1week.count > 16.0 {
+        return PeerClassification::AllGood;
+    };
+    if ewmas.stat_1month.reliability > 0.35 && ewmas.stat_1month.count > 32.0 {
+        return PeerClassification::AllGood;
+    };
+
+    // at least one success in the last 2 hours
+    if let Some(last_success) = peer_stats.last_success {
+        if let Ok(duration) = last_success.elapsed() {
+            if duration <= Duration::from_secs(60 * 60 * 2) {
+                return PeerClassification::MerelySyncedEnough;
+            }
+        }
+    }
+    return PeerClassification::Unknown;
+}
+
 #[derive(Debug, Clone, Default)]
 struct ServingNodes {
     primaries: HashSet<SocketAddr>,
@@ -613,82 +691,6 @@ fn exponential_acquisition_threshold_secs(peer_stats: &PeerStats) -> u64 {
     }
 }
 
-fn get_classification(
-    peer_stats: &Option<PeerStats>,
-    peer_address: &SocketAddr,
-    network: Network,
-) -> PeerClassification {
-    let peer_stats = match peer_stats {
-        None => return PeerClassification::Unknown,
-        Some(peer_stats) => peer_stats,
-    };
-
-    if peer_stats.total_attempts == 0 {
-        // we never attempted to connect to this peer
-        return PeerClassification::Unknown;
-    }
-
-    if peer_stats.peer_derived_data.is_none() {
-        if peer_stats.tcp_connections_ok > 10 &  {
-            // at least 10 TCP connections, but never been able to negotiate the Zcash protocol
-            return PeerClassification::BeyondUseless;
-        } else {
-            return PeerClassification::NetworkBad; // need more samples before hitting it with the worst possible penalty
-        }
-    }
-
-    let peer_derived_data = peer_stats.peer_derived_data.as_ref().unwrap();
-
-    if !peer_derived_data
-        .peer_services
-        .intersects(PeerServices::NODE_NETWORK)
-    {
-        return PeerClassification::Bad;
-    }
-
-    if peer_derived_data.numeric_version < required_serving_version(network) {
-        return PeerClassification::Bad;
-    }
-
-    if peer_derived_data.peer_height < required_height(network) {
-        return PeerClassification::Bad;
-    }
-
-    if !peer_address.ip().is_global() {
-        return PeerClassification::Bad;
-    }
-    let ewmas = peer_stats.ewma_pack;
-    if peer_stats.total_attempts <= 3 && peer_stats.valid_block_reply_ok * 2 >= peer_stats.total_attempts
-    {
-        return PeerClassification::AllGood;
-    };
-
-    if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0 {
-        return PeerClassification::AllGood;
-    };
-    if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0 {
-        return PeerClassification::AllGood;
-    };
-    if ewmas.stat_1day.reliability > 0.55 && ewmas.stat_1day.count > 8.0 {
-        return PeerClassification::AllGood;
-    };
-    if ewmas.stat_1week.reliability > 0.45 && ewmas.stat_1week.count > 16.0 {
-        return PeerClassification::AllGood;
-    };
-    if ewmas.stat_1month.reliability > 0.35 && ewmas.stat_1month.count > 32.0 {
-        return PeerClassification::AllGood;
-    };
-
-    // at least one success in the last 2 hours
-    if let Some(last_success) = peer_stats.last_success {
-        if let Ok(duration) = last_success.elapsed() {
-            if duration <= Duration::from_secs(60 * 60 * 2) {
-                return PeerClassification::MerelySyncedEnough;
-            }
-        }
-    }
-    return PeerClassification::Unknown;
-}
 
 fn required_height(network: Network) -> Height {
     match network {
