@@ -714,7 +714,7 @@ async fn main() {
     loop {
         println!("starting Loop");
         match mode {
-            CrawlingMode::FastAcquisition => {
+            _ => {
                 let timeouts = Timeouts {
                     peers_timeout: Duration::from_secs(32),
                     hash_timeout: Duration::from_secs(32),
@@ -726,27 +726,27 @@ async fn main() {
                     timeouts,
                 )
                 .await;
-                {
-                    let serving_nodes_testing = serving_nodes_shared.read().unwrap();
-                    if serving_nodes_testing.primaries.len() + serving_nodes_testing.alternates.len() > 32 {
-                        mode = CrawlingMode::LongTermUpdates;
-                    }
-                }
+                // {
+                //     let serving_nodes_testing = serving_nodes_shared.read().unwrap();
+                //     if serving_nodes_testing.primaries.len() + serving_nodes_testing.alternates.len() > 32 {
+                //         mode = CrawlingMode::LongTermUpdates;
+                //     }
+                // }
             }
-            CrawlingMode::LongTermUpdates => {
-                let timeouts = Timeouts {
-                    peers_timeout: Duration::from_secs(32),
-                    hash_timeout: Duration::from_secs(32),
-                };
-                slow_walker(
-                    &serving_nodes_shared,
-                    &mut internal_peer_tracker,
-                    network,
-                    max_inflight_conn.try_into().unwrap(),
-                    timeouts,
-                )
-                .await;
-            }
+            // CrawlingMode::LongTermUpdates => {
+            //     let timeouts = Timeouts {
+            //         peers_timeout: Duration::from_secs(32),
+            //         hash_timeout: Duration::from_secs(32),
+            //     };
+            //     slow_walker(
+            //         &serving_nodes_shared,
+            //         &mut internal_peer_tracker,
+            //         network,
+            //         max_inflight_conn.try_into().unwrap(),
+            //         timeouts,
+            //     )
+            //     .await;
+            // }
         }
         // just in case...we could add code to check if this does anything to find bugs with the incremental update
         update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
