@@ -160,13 +160,7 @@ impl DnsContext {
         Some(response_handle.send_response(response).await.unwrap())
     }
 }
-#[derive(Debug, Clone)]
-enum HashExecutionResult {
-    RetryConnection(),                 // our fault
-    ConnectionFail(),                  // their fault
-    BlockRequestFail(PeerDerivedData), // their fault
-    BlockRequestOK(PeerDerivedData),   // good
-}
+
 #[derive(Debug, Clone)]
 struct PeerDerivedData {
     numeric_version: Version,
@@ -241,7 +235,7 @@ async fn hash_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
     connection_timeout: Duration,
-) -> HashExecutionResult {
+) -> BlockProbeResult {
     println!("Starting new hash probe connection: peer addr is {:?}", peer_addr);
     let connection = connect_isolated_tcp_direct(
         network,
@@ -262,7 +256,7 @@ async fn hash_probe_inner(
                 "Probe connection with {:?} TIMED OUT: {:?}",
                 peer_addr, timeout_error
             );
-            HashExecutionResult::ConnectionFail()
+            BlockProbeResult::TCPFailure // this counts as network brokenness, should not count as BeyondUseless, just regular Bad
         }
         Ok(connection_might_have_failed) => {
             match connection_might_have_failed {
@@ -275,17 +269,17 @@ async fn hash_probe_inner(
                         connection_failure.downcast_ref::<std::io::Error>()
                     {
                         println!(
-                            "IO error detected... decannisterizing: error = {:?}, test={:?}",
-                            decanisterized_error,
-                            decanisterized_error.kind() == std::io::ErrorKind::Uncategorized
-                        );
+                            "IO error detected... decannisterizing: error = {:?}",
+                            decanisterized_error);
                         // Connection with XXX.XXX.XXX.XXX:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
                         if decanisterized_error.kind() == std::io::ErrorKind::Uncategorized {
                             // probably an EMFILES / ENFILES
-                            return HashExecutionResult::RetryConnection();
+                            return BlockProbeResult::MustRetry;
                         }
                     }
-                    HashExecutionResult::ConnectionFail() // need to special-case this for ETOOMANYOPENFILES
+                    // need to differentiate between TCP connection failed (regular brokenness, should just be Bad)
+                    // and "tcp connection established, but zebra-network gave us protocol-level errors", which is protocol brokenness -- should be BeyondUseless
+                    BlockProbeResult::TCPFailure // need to differentiate between network brokenness and protocol brokenness; only the latter should provoke a BeyondUseless categorization
                 }
                 Ok(mut good_connection) => {
                     let numeric_version = good_connection.connection_info.remote.version;
@@ -311,7 +305,7 @@ async fn hash_probe_inner(
                     match hash_query_response {
                         Err(protocol_error) => {
                             println!("protocol failure after requesting blocks by hash with peer {}: {:?}", peer_addr, protocol_error);
-                            return HashExecutionResult::BlockRequestFail(peer_derived_data);
+                            return BlockProbeResult::BlockRequestFail(peer_derived_data);
                         }
                         Ok(hash_query_protocol_response) => {
                             match hash_query_protocol_response {
@@ -330,14 +324,14 @@ async fn hash_probe_inner(
                                     if intersection_count == hash_checkpoints.len() {
                                         // All requested blocks are there and hash OK
                                         println!("Peer {:?} returned good hashes", peer_addr);
-                                        return HashExecutionResult::BlockRequestOK(peer_derived_data);
+                                        return BlockProbeResult::BlockRequestOK(peer_derived_data);
                                     }
                                     // node returned a Blocks response, but it wasn't complete/correct for some reason
-                                    HashExecutionResult::BlockRequestFail(peer_derived_data)
+                                    BlockProbeResult::BlockRequestFail(peer_derived_data)
                                 } // Response::Blocks(block_vector)
                                 _ => {
                                     // connection established but we didn't get a Blocks response
-                                    HashExecutionResult::BlockRequestFail(peer_derived_data)
+                                    BlockProbeResult::BlockRequestFail(peer_derived_data)
                                 }
                             } // match hash_query_protocol_response
                         } // Ok(hash_query_protocol_response)
@@ -426,7 +420,25 @@ struct EWMAState {
     reliability: f64,
 }
 
+
+#[derive(Debug, Clone)]
+enum BlockProbeResult {
+    // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
+    MustRetry, // increment nothing
+
+    // Error establishing the TCP connection. Counts as a normal failure against the node
+    TCPFailure, // increment total_attempts
+
+    // Protocol negotiation failure. We were able to establish a TCP connection, but they said something zebra-network didn't like
+    ProtocolBad, // increment total_attempts and tcp_connections_ok
+
+    // Abnormal reply to the block request. We negotiated the protocol OK, but their reply to the block requests wasn't perfect
+    BlockRequestFail(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotations_ok
+
+    // Nominal reply to the block request
+    BlockRequestOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotations_ok and valid_block_reply_ok
 }
+
 
 #[derive(Debug, Clone)]
 struct PeerStats {
@@ -879,12 +891,12 @@ async fn hash_probe_and_update(
     //println!("result = {:?}", poll_res);
     new_peer_stats.total_attempts += 1;
     match poll_res {
-        HashExecutionResult::RetryConnection() => {
+        BlockProbeResult::RetryConnection() => {
             println!("Retry the connection!");
             return (proband_address, ProbeResult::MustRetryHashResult);
         }
-        HashExecutionResult::BlockRequestOK(new_peer_data) => {
-            new_peer_stats.total_successes += 1;
+        BlockProbeResult::BlockRequestOK(new_peer_data) => {
+            new_peer_stats.total_hash_successes += 1;
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             new_peer_stats.last_success = Some(SystemTime::now());
             update_ewma_pack(
@@ -894,7 +906,7 @@ async fn hash_probe_and_update(
                 true,
             );
         }
-        HashExecutionResult::BlockRequestFail(new_peer_data) => {
+        BlockProbeResult::BlockRequestFail(new_peer_data) => {
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -903,7 +915,7 @@ async fn hash_probe_and_update(
                 false,
             );
         }
-        HashExecutionResult::ConnectionFail() => {
+        BlockProbeResult::ConnectionFail() => {
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
