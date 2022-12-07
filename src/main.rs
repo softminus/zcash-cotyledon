@@ -522,7 +522,14 @@ fn get_classification(
     }
 
     if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        // negotiating the protocol at least once rules out Unknown and BeyondUseless
+        // therefore, the node is one of {AllGood, MerelySyncedEnough, EventuallyMaybeSynced, GenericBad}
+        // we test in the order of decreasing stringency, and return whenever we meet all the criteria for a condition
 
+        // for AllGood, we need to pass the uptime criteria and (peer_services test, numeric version test, peer_height test)
+        // for MerelySyncedEnough, we merely need a good block test in the past 2 hours and (peer_services test, numeric version test, peer_height test)
+        // for EventuallyMaybeSynced, we need to have passed (peer_services test, numeric version test) in 24 hours, but peer_height test can fail
+        // otherwise, we give a GenericBad
 
 
         // AllGood test section
@@ -577,10 +584,12 @@ fn get_classification(
 
     } else { // never were able to negotiate the wire protocol
         if peer_stats.tcp_connections_ok > 10 {
-            // at least 10 TCP connections, but never been able to negotiate the Zcash protocol
+            // at least 10 TCP connections succeeded, but never been able to negotiate the Zcash protocol
+            // this isn't a zcash node and isn't going to turn into one any time soon
             return PeerClassification::BeyondUseless;
         } else {
-            return PeerClassification::GenericBad; // need more samples before hitting it with the worst possible penalty
+            // need more samples before hitting it with the worst possible penalty
+            return PeerClassification::GenericBad;
         }
     }
 }
