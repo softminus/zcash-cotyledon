@@ -418,48 +418,6 @@ async fn probe_for_peers_two(
 }
 
 
-async fn probe_for_peers(
-    peer_addr: SocketAddr,
-    network: Network,
-    timeouts: &Timeouts,
-    random_delay: Duration,
-) -> (SocketAddr, PeerProbeResult) {
-    sleep(random_delay).await;
-    println!("Starting peer probe connection: peer addr is {:?}", peer_addr);
-    let the_connection = connect_isolated_tcp_direct(
-        network,
-        peer_addr,
-        String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
-    );
-    let the_connection = timeout(timeouts.peers_timeout, the_connection);
-    let x = the_connection.await;
-    if let Ok(x) = x {
-        match x {
-            Ok(mut z) => {
-                let mut peers_vec: Vec<MetaAddr> = Vec::new();
-                for _attempt in 0..2 {
-                    let resp = z.call(Request::Peers).await;
-                    if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = resp {
-                        if candidate_peers.len() > 1 {
-                            peers_vec = candidate_peers.to_vec();
-                            //println!("{:?}", peers_vec);
-                            break;
-                        }
-                    }
-                }
-                return (peer_addr, PeerProbeResult::PeersResult(peers_vec));
-            } // ok connect
-            Err(error) => {
-                println!("Peers connection with {:?} failed: {:?}", peer_addr, error);
-                return (peer_addr, PeerProbeResult::PeersFail);
-            }
-        };
-    } else {
-        println!("Peers connection with {:?} TIMED OUT: {:?}", peer_addr, x);
-        (peer_addr, PeerProbeResult::PeersFail)
-    }
-}
-
 //Connection with 74.208.91.217:8233 failed: Serialization(Parse("getblocks version did not match negotiation"))
 
 #[derive(Debug, Clone, Copy, Default)]
