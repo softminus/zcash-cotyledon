@@ -572,6 +572,13 @@ fn get_classification(
                 }
             }
         }
+
+
+        // GenericBad test section
+        println!("classifying node {:?} with PeerStats {:?} as GenericBad despite having negotiated wire protocol: {:?}", peer_address, peer_stats, peer_derived_data);
+        return PeerClassification::GenericBad;
+
+
     } else { // never were able to negotiate the wire protocol
         if peer_stats.tcp_connections_ok > 10 {
             // at least 10 TCP connections, but never been able to negotiate the Zcash protocol
