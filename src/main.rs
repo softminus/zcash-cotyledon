@@ -161,7 +161,7 @@ impl DnsContext {
     }
 }
 #[derive(Debug, Clone)]
-enum PollStatus {
+enum HashExecutionResult {
     RetryConnection(),                 // our fault
     ConnectionFail(),                  // their fault
     BlockRequestFail(PeerDerivedData), // their fault
@@ -237,14 +237,11 @@ static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     proband_hashes
 });
 
-
-// , tcp_timeout: Duration, protocol_timeout: Duration
-
-async fn test_a_server(
+async fn hash_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
     connection_timeout: Duration,
-) -> PollStatus {
+) -> HashExecutionResult {
     println!("Starting new hash probe connection: peer addr is {:?}", peer_addr);
     let connection = connect_isolated_tcp_direct(
         network,
@@ -265,7 +262,7 @@ async fn test_a_server(
                 "Probe connection with {:?} TIMED OUT: {:?}",
                 peer_addr, timeout_error
             );
-            PollStatus::ConnectionFail()
+            HashExecutionResult::ConnectionFail()
         }
         Ok(connection_might_have_failed) => {
             match connection_might_have_failed {
@@ -285,10 +282,10 @@ async fn test_a_server(
                         // Connection with XXX.XXX.XXX.XXX:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
                         if decanisterized_error.kind() == std::io::ErrorKind::Uncategorized {
                             // probably an EMFILES / ENFILES
-                            return PollStatus::RetryConnection();
+                            return HashExecutionResult::RetryConnection();
                         }
                     }
-                    PollStatus::ConnectionFail() // need to special-case this for ETOOMANYOPENFILES
+                    HashExecutionResult::ConnectionFail() // need to special-case this for ETOOMANYOPENFILES
                 }
                 Ok(mut good_connection) => {
                     let numeric_version = good_connection.connection_info.remote.version;
@@ -314,7 +311,7 @@ async fn test_a_server(
                     match hash_query_response {
                         Err(protocol_error) => {
                             println!("protocol failure after requesting blocks by hash with peer {}: {:?}", peer_addr, protocol_error);
-                            return PollStatus::BlockRequestFail(peer_derived_data);
+                            return HashExecutionResult::BlockRequestFail(peer_derived_data);
                         }
                         Ok(hash_query_protocol_response) => {
                             match hash_query_protocol_response {
@@ -333,14 +330,14 @@ async fn test_a_server(
                                     if intersection_count == hash_checkpoints.len() {
                                         // All requested blocks are there and hash OK
                                         println!("Peer {:?} returned good hashes", peer_addr);
-                                        return PollStatus::BlockRequestOK(peer_derived_data);
+                                        return HashExecutionResult::BlockRequestOK(peer_derived_data);
                                     }
                                     // node returned a Blocks response, but it wasn't complete/correct for some reason
-                                    PollStatus::BlockRequestFail(peer_derived_data)
+                                    HashExecutionResult::BlockRequestFail(peer_derived_data)
                                 } // Response::Blocks(block_vector)
                                 _ => {
                                     // connection established but we didn't get a Blocks response
-                                    PollStatus::BlockRequestFail(peer_derived_data)
+                                    HashExecutionResult::BlockRequestFail(peer_derived_data)
                                 }
                             } // match hash_query_protocol_response
                         } // Ok(hash_query_protocol_response)
@@ -358,7 +355,7 @@ async fn probe_for_peers_two(
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
-) -> (SocketAddr, PeerProbeResult) {
+) -> (SocketAddr, ProbeResult) {
     println!("Starting peer probe connection: peer addr is {:?}", peer_addr);
     let connection = connect_isolated_tcp_direct(
         network,
@@ -374,7 +371,7 @@ async fn probe_for_peers_two(
                 "Probe connection with {:?} TIMED OUT: {:?}",
                 peer_addr, timeout_error
             );
-            return (peer_addr, PeerProbeResult::PeersFail);
+            return (peer_addr, ProbeResult::PeersFail);
         }
         Ok(connection_might_have_failed) => {
             match connection_might_have_failed {
@@ -394,10 +391,10 @@ async fn probe_for_peers_two(
                         // Connection with XXX.XXX.XXX.XXX:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
                         if decanisterized_error.kind() == std::io::ErrorKind::Uncategorized {
                             // probably an EMFILES / ENFILES
-                            return (peer_addr, PeerProbeResult::MustRetryPeersResult);
+                            return (peer_addr, ProbeResult::MustRetryPeersResult);
                         }
                     }
-                    return (peer_addr, PeerProbeResult::PeersFail);
+                    return (peer_addr, ProbeResult::PeersFail);
                 }
                 Ok(mut good_connection) => {
                     for _attempt in 0..2 {
@@ -406,11 +403,11 @@ async fn probe_for_peers_two(
                             .await;
                         if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = peers_query_response {
                             if candidate_peers.len() > 1 {
-                                return (peer_addr, PeerProbeResult::PeersResult(candidate_peers.to_vec()));
+                                return (peer_addr, ProbeResult::PeersResult(candidate_peers.to_vec()));
                             }
                         }
                     }
-                    return (peer_addr, PeerProbeResult::PeersFail);
+                    return (peer_addr, ProbeResult::PeersFail);
                 }
             }
         }
@@ -846,20 +843,20 @@ struct Timeouts {
     peers_timeout: Duration,
 }
 #[derive(Debug, Clone)]
-enum PeerProbeResult {
+enum ProbeResult {
     HashResult(PeerStats),
     MustRetryHashResult,
     PeersResult(Vec<MetaAddr>),
     PeersFail,
     MustRetryPeersResult,
 }
-async fn probe_and_update(
+async fn hash_probe_and_update(
     proband_address: SocketAddr,
     old_stats: Option<PeerStats>,
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
-) -> (SocketAddr, PeerProbeResult) {
+) -> (SocketAddr, ProbeResult) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
         None => PeerStats {
@@ -874,15 +871,15 @@ async fn probe_and_update(
     };
     sleep(random_delay).await;
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
-    let poll_res = test_a_server(proband_address, network, timeouts.hash_timeout).await;
+    let poll_res = hash_probe_inner(proband_address, network, timeouts.hash_timeout).await;
     //println!("result = {:?}", poll_res);
     new_peer_stats.total_attempts += 1;
     match poll_res {
-        PollStatus::RetryConnection() => {
+        HashExecutionResult::RetryConnection() => {
             println!("Retry the connection!");
-            return (proband_address, PeerProbeResult::MustRetryHashResult);
+            return (proband_address, ProbeResult::MustRetryHashResult);
         }
-        PollStatus::BlockRequestOK(new_peer_data) => {
+        HashExecutionResult::BlockRequestOK(new_peer_data) => {
             new_peer_stats.total_successes += 1;
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             new_peer_stats.last_success = Some(SystemTime::now());
@@ -893,7 +890,7 @@ async fn probe_and_update(
                 true,
             );
         }
-        PollStatus::BlockRequestFail(new_peer_data) => {
+        HashExecutionResult::BlockRequestFail(new_peer_data) => {
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -902,7 +899,7 @@ async fn probe_and_update(
                 false,
             );
         }
-        PollStatus::ConnectionFail() => {
+        HashExecutionResult::ConnectionFail() => {
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
@@ -912,7 +909,7 @@ async fn probe_and_update(
         }
     }
     new_peer_stats.last_polled = Some(current_poll_time);
-    return (proband_address, PeerProbeResult::HashResult(new_peer_stats));
+    return (proband_address, ProbeResult::HashResult(new_peer_stats));
 }
 
 // async fn slow_walker(
@@ -977,28 +974,28 @@ async fn fast_walker(
     let mut handles = FuturesUnordered::new();
     let mut rng = rand::thread_rng();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        handles.push(Box::pin(probe_and_update(
+        handles.push(Box::pin(hash_probe_and_update(
             proband_address.clone(),
             peer_stat.clone(),
             network,
             &timeouts,
             Duration::from_secs(rng.gen_range(0..1))),
-        ) as Pin<Box<dyn Future<Output = (SocketAddr, PeerProbeResult)>>>);
+        ) as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
         handles.push(Box::pin(probe_for_peers_two(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
     }
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
         match probe_result.1 {
-            PeerProbeResult::HashResult(new_peer_stat) => {
+            ProbeResult::HashResult(new_peer_stat) => {
                 println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
                 internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
                 single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat.clone()));
                 println!("HashMap len: {:?}", internal_peer_tracker.len());
             },
-            PeerProbeResult::MustRetryHashResult => {
+            ProbeResult::MustRetryHashResult => {
                 // we gotta retry
                 println!("RETRYING {:?}", peer_address);
-                handles.push(Box::pin(probe_and_update(
+                handles.push(Box::pin(hash_probe_and_update(
                     peer_address.clone(),
                     internal_peer_tracker[&peer_address].clone(),
                     network,
@@ -1006,12 +1003,12 @@ async fn fast_walker(
                     Duration::from_secs(rng.gen_range(0..1)),
                 )));
             },
-            PeerProbeResult::PeersResult(new_peers) => {
+            ProbeResult::PeersResult(new_peers) => {
                 for peer in new_peers {
                     let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
                     if !internal_peer_tracker.contains_key(&key) {
                         internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                        handles.push(Box::pin(probe_and_update(
+                        handles.push(Box::pin(hash_probe_and_update(
                             key.clone(),
                             <Option<PeerStats>>::None,
                             network,
@@ -1022,10 +1019,10 @@ async fn fast_walker(
                     }
                 }
             },
-            PeerProbeResult::PeersFail => {
+            ProbeResult::PeersFail => {
                 println!("probing {:?} for peers failed, not retrying", peer_address);
             },
-            PeerProbeResult::MustRetryPeersResult => {
+            ProbeResult::MustRetryPeersResult => {
                 handles.push(Box::pin(probe_for_peers_two(peer_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
             },
         }
