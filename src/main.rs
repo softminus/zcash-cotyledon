@@ -464,25 +464,38 @@ enum PeerClassification {
 }
 
 
-fn ancillary_checks_all_good(peer_derived_data: &PeerDerivedData, network: Network) -> PeerClassification {
-    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) |
-            peer_derived_data.numeric_version < required_serving_version(network) |
+fn ancillary_checks_all_good(peer_derived_data: &PeerDerivedData, peer_address: &SocketAddr, peer_stats: &PeerStats, network: Network) -> PeerClassification {
+    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) ||
+            peer_derived_data.numeric_version < required_serving_version(network) ||
             peer_derived_data.peer_height < required_height(network)
     {
+        println!("Classifying node {:?} as GenericBad despite meeting other AllGood criteria. PeerStats: {:?}", peer_address, peer_stats);
         return PeerClassification::GenericBad;
     } else {
         return PeerClassification::AllGood;
     }
 }
 
-fn ancillary_checks_merely_synced(peer_derived_data: &PeerDerivedData, network: Network) -> PeerClassification {
-    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) |
-            peer_derived_data.numeric_version < required_serving_version(network) |
+fn ancillary_checks_merely_synced(peer_derived_data: &PeerDerivedData, peer_address: &SocketAddr, peer_stats: &PeerStats, network: Network) -> PeerClassification {
+    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) ||
+            peer_derived_data.numeric_version < required_serving_version(network) ||
             peer_derived_data.peer_height < required_height(network)
     {
+        println!("Classifying node {:?} as GenericBad despite meeting other MerelySyncedEnough criteria. PeerStats: {:?}", peer_address, peer_stats);
         return PeerClassification::GenericBad;
     } else {
         return PeerClassification::MerelySyncedEnough;
+    }
+}
+
+fn ancillary_checks_eventually_maybe_synced(peer_derived_data: &PeerDerivedData, peer_address: &SocketAddr, peer_stats: &PeerStats, network: Network) -> PeerClassification {
+    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) ||
+            peer_derived_data.numeric_version < required_serving_version(network)
+    {
+        println!("Classifying node {:?} as GenericBad despite meeting other EventuallyMaybeSynced criteria. PeerStats: {:?}", peer_address, peer_stats);
+        return PeerClassification::GenericBad;
+    } else {
+        return PeerClassification::EventuallyMaybeSynced;
     }
 }
 
@@ -527,30 +540,30 @@ fn get_classification(
         let ewmas = peer_stats.ewma_pack;
         if peer_stats.total_attempts <= 3 && peer_stats.valid_block_reply_ok * 2 >= peer_stats.total_attempts
         {
-            return ancillary_checks_all_good(&peer_stats, network);
+            return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
 
         if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0 {
-            return ancillary_checks_all_good(&peer_stats, network);
+            return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
         if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0 {
-            return ancillary_checks_all_good(&peer_stats, network);
+            return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
         if ewmas.stat_1day.reliability > 0.55 && ewmas.stat_1day.count > 8.0 {
-            return ancillary_checks_all_good(&peer_stats, network);
+            return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
         if ewmas.stat_1week.reliability > 0.45 && ewmas.stat_1week.count > 16.0 {
-            return ancillary_checks_all_good(&peer_stats, network);
+            return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
         if ewmas.stat_1month.reliability > 0.35 && ewmas.stat_1month.count > 32.0 {
-            return ancillary_checks_all_good(&peer_stats, network);
+            return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
         // MerelySyncedEnough test section
         // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
         if let Some(last_success) = peer_stats.last_success {
             if let Ok(duration) = last_success.elapsed() {
                 if duration <= Duration::from_secs(60 * 60 * 2) {
-                    return ancillary_checks_merely_synced(&peer_stats, network);
+                    return ancillary_checks_merely_synced(peer_derived_data, peer_address, peer_stats, network);
                 }
             }
         }
