@@ -451,12 +451,12 @@ async fn probe_for_peers(
             } // ok connect
             Err(error) => {
                 println!("Peers connection with {:?} failed: {:?}", peer_addr, error);
-                return (peer_addr, PeerProbeResult::FailedPeerPoll);
+                return (peer_addr, PeerProbeResult::PeersFail);
             }
         };
     } else {
         println!("Peers connection with {:?} TIMED OUT: {:?}", peer_addr, x);
-        (peer_addr, PeerProbeResult::FailedPeerPoll)
+        (peer_addr, PeerProbeResult::PeersFail)
     }
 }
 
@@ -892,7 +892,8 @@ enum PeerProbeResult {
     HashResult(PeerStats),
     MustRetryHashResult,
     PeersResult(Vec<MetaAddr>),
-    FailedPeerPoll
+    PeersFail,
+    MustRetryPeersResult,
 }
 async fn probe_and_update(
     proband_address: SocketAddr,
@@ -1042,7 +1043,10 @@ async fn fast_walker(
             PeerProbeResult::PeersResult(new_peers) => {
 
             },
-            PeerProbeResult::FailedPeerPoll => {
+            PeerProbeResult::PeersFail => {
+
+            },
+            PeerProbeResult::MustRetryPeersResult => {
 
             },
         }
