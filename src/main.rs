@@ -888,7 +888,7 @@ fn single_node_update(
     new_peer_address: &SocketAddr,
     new_peer_stat: &Option<PeerStats>,
 ) {
-    if peer_address.ip().is_global()
+    if new_peer_address.ip().is_global()
     {
         let old_nodes = serving_nodes_shared.read().unwrap();
         let mut primary_nodes = old_nodes.primaries.clone();
