@@ -356,6 +356,7 @@ async fn probe_for_peers_two(
     timeouts: &Timeouts,
     random_delay: Duration,
 ) -> (SocketAddr, ProbeResult) {
+    sleep(random_delay).await;
     println!("Starting peer probe connection: peer addr is {:?}", peer_addr);
     let connection = connect_isolated_tcp_direct(
         network,
