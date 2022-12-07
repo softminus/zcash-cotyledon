@@ -961,29 +961,25 @@ async fn fast_walker(
         handles.push(Box::pin(probe_for_peers(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
     }
     while let Some(probe_result) = handles.next().await {
-        println!("XXXXXXXXXXXXXXXXXXXXXXXX {:?}", probe_result);
         let peer_address = probe_result.0;
         match probe_result.1 {
-            HashResult(new_peer_stats) => {
+            PeerProbeResult::HashResult(new_peer_stat) => {
+                println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
+                internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
+                single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat.clone()));
+                println!("HashMap len: {:?}", internal_peer_tracker.len());
+            },
+            PeerProbeResult::MustRetryHashResult => {
 
             },
-            MustRetryHashResult => {
+            PeerProbeResult::PeersResult(new_peers) => {
 
             },
-            PeersResult(new_peers) => {
+            PeerProbeResult::FailedPeerPoll => {
 
-            },
-            FailedPeerPoll => {
-                
             },
         }
-        // if let Some(new_peer_stat) = probe_result.1 {
-        //     println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
-        //     //println!("new peers: {:?}", new_peers);
-        //     let new_peer_stat = new_peer_stat.clone();
-        //     internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
-        //     single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat));
-        //     println!("HashMap len: {:?}", internal_peer_tracker.len());
+
         // } else {
         //     // we gotta retry
         //     println!("RETRYING {:?}", peer_address);
