@@ -1065,10 +1065,10 @@ async fn fast_walker(
                 }
             },
             PeerProbeResult::PeersFail => {
-
+                println!("probing {:?} for peers failed, not retrying", peer_address);
             },
             PeerProbeResult::MustRetryPeersResult => {
-
+                handles.push(Box::pin(probe_for_peers_two(peer_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
             },
         }
 
