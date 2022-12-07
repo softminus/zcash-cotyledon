@@ -624,13 +624,17 @@ fn get_classification(
     };
 
     if peer_stats.total_attempts == 0 {
-        // we never pinged them
+        // we never attempted to connect to this peer
         return PeerClassification::Unknown;
     }
 
     if peer_stats.peer_derived_data.is_none() {
-        // we tried, but never been able to negotiate a connection
-        return PeerClassification::BeyondUseless;
+        if peer_stats.tcp_connections_ok > 10 &  {
+            // at least 10 TCP connections, but never been able to negotiate the Zcash protocol
+            return PeerClassification::BeyondUseless;
+        } else {
+            return PeerClassification::NetworkBad; // need more samples before hitting it with the worst possible penalty
+        }
     }
 
     let peer_derived_data = peer_stats.peer_derived_data.as_ref().unwrap();
