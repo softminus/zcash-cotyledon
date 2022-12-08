@@ -231,6 +231,34 @@ static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     proband_hashes
 });
 
+
+// TCPFailure errors:
+// Os { code: 60, kind: TimedOut, message: "Operation timed out" }
+// Os { code: 61, kind: ConnectionRefused, message: "Connection refused" }
+// Elapsed(())
+// ConnectionClosed
+// Serialization(Io(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }))
+
+
+
+// ProtocolBad errors
+// it's possible some of the TCPFailure errors indicate a protocol problem but we want to avoid false positives
+// Serialization(Parse("getblocks version did not match negotiation"))
+// Serialization(Parse("getblocks version did not match negotiation"))
+// Serialization(Parse("supplied magic did not meet expectations"))
+// ObsoleteVersion(_)
+
+// MustRetry errors:
+// Os { code: 65, kind: HostUnreachable, message: "No route to host" }
+// Os { code: 51, kind: NetworkUnreachable, message: "Network is unreachable" }
+// Os { code: 49, kind: AddrNotAvailable, message: "Can't assign requested address" }
+
+
+
+
+
+
+
 async fn hash_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
@@ -305,6 +333,10 @@ async fn hash_probe_inner(
                     match hash_query_response {
                         Err(protocol_error) => {
                             println!("protocol failure after requesting blocks by hash with peer {}: {:?}", peer_addr, protocol_error);
+                            // so far the only errors we've seen here look like one of:
+                            // SharedPeerError(ConnectionClosed)
+                            // SharedPeerError(ConnectionReceiveTimeout)
+                            // SharedPeerError(NotFoundResponse([Block(block::Hash("")), Block(block::Hash(""))]))
                             return BlockProbeResult::BlockRequestFail(peer_derived_data);
                         }
                         Ok(hash_query_protocol_response) => {
