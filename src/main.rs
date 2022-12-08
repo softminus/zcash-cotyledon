@@ -444,7 +444,7 @@ enum BlockProbeResult {
 struct PeerStats {
     total_attempts: u64,
     tcp_connections_ok: u64,
-    protocol_negotations_ok: u64,
+    protocol_negotiations_ok: u64,
     valid_block_reply_ok: u64,
     ewma_pack: EWMAPack,
     last_polled: Option<SystemTime>,
