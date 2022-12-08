@@ -1002,7 +1002,7 @@ async fn main() {
     dns_server.register_socket(UdpSocket::bind(dns_socket).await.unwrap());
     tokio::spawn(dns_server.block_until_done());
 
-    let initial_peer_addrs = [
+    let initial_peer_addrs = [ // make me configurable
         "20.47.97.70:8233",
         "51.79.229.21:8233",
         "34.73.242.102:8233",
@@ -1021,8 +1021,8 @@ async fn main() {
         match mode {
             CrawlingMode::FastAcquisition => {
                 let timeouts = Timeouts {
-                    peers_timeout: Duration::from_secs(8),
-                    hash_timeout: Duration::from_secs(8),
+                    peers_timeout: Duration::from_secs(8), // make me configurable
+                    hash_timeout: Duration::from_secs(8), // make me configurable
                 };
                 fast_walker(
                     &serving_nodes_shared,
@@ -1030,14 +1030,14 @@ async fn main() {
                     network,
                     max_inflight_conn.try_into().unwrap(),
                     timeouts,
-                    16,
+                    16, // make me configurable
                 )
                 .await;
                 {
                     let serving_nodes_testing = serving_nodes_shared.read().unwrap();
                     if serving_nodes_testing.primaries.len()
                         + serving_nodes_testing.alternates.len()
-                        > 3
+                        > 3 // make me configurable
                     {
                         println!(
                             "SWITCHING TO SLOW WALKER, we are serving a total of {:?} nodes",
@@ -1052,8 +1052,8 @@ async fn main() {
             }
             CrawlingMode::LongTermUpdates => {
                 let timeouts = Timeouts {
-                    peers_timeout: Duration::from_secs(32),
-                    hash_timeout: Duration::from_secs(32),
+                    peers_timeout: Duration::from_secs(32), // make me configurable
+                    hash_timeout: Duration::from_secs(32),  // make me configurable
                 };
                 slow_walker(
                     &serving_nodes_shared,
@@ -1061,7 +1061,7 @@ async fn main() {
                     network,
                     max_inflight_conn.try_into().unwrap(),
                     timeouts,
-                    128,
+                    128, // make me configurable
                 )
                 .await;
             }
