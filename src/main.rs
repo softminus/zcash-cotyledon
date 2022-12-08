@@ -2,22 +2,24 @@
 #![feature(io_error_uncategorized)]
 #![feature(io_error_more)]
 #![feature(once_cell)]
+use futures::Future;
 use futures_util::stream::FuturesUnordered;
 use futures_util::StreamExt;
-use futures::Future;
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
-use std::str::FromStr;
 use std::pin::Pin;
+use std::str::FromStr;
 use std::sync::{Arc, LazyLock, RwLock};
-use tokio::time::sleep;
 use std::time::{Duration, SystemTime};
+use tokio::time::sleep;
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;
 use zebra_chain::serialization::SerializationError;
 use zebra_network::types::PeerServices;
-use zebra_network::{connect_isolated_tcp_direct, InventoryResponse, Request, Response, Version, HandshakeError};
+use zebra_network::{
+    connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
+};
 //use zebra_network::protocol::external::types::Version;
 use rand::Rng;
 use rlimit::{getrlimit, increase_nofile_limit, Resource};
@@ -105,20 +107,50 @@ impl DnsContext {
     ) -> Option<dns::ResponseInfo> {
         if request.op_code() != dnsop::OpCode::Query {
             let response = MessageResponseBuilder::from_message_request(request);
-            return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::ServFail)).await.unwrap());
+            return Some(
+                response_handle
+                    .send_response(
+                        response.error_msg(request.header(), dnsop::ResponseCode::ServFail),
+                    )
+                    .await
+                    .unwrap(),
+            );
         }
         if request.message_type() != dnsop::MessageType::Query {
             let response = MessageResponseBuilder::from_message_request(request);
-            return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::ServFail)).await.unwrap());
+            return Some(
+                response_handle
+                    .send_response(
+                        response.error_msg(request.header(), dnsop::ResponseCode::ServFail),
+                    )
+                    .await
+                    .unwrap(),
+            );
         }
         if request.query().query_class() != dnsrr::DNSClass::IN {
             let response = MessageResponseBuilder::from_message_request(request);
-            return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::ServFail)).await.unwrap());
+            return Some(
+                response_handle
+                    .send_response(
+                        response.error_msg(request.header(), dnsop::ResponseCode::ServFail),
+                    )
+                    .await
+                    .unwrap(),
+            );
         }
-        let endpoint = dnsrr::LowerName::from(dnsrr::Name::from_str("mainnet-test-seed.electriccoin.co").unwrap()); // make me configurable
+        let endpoint = dnsrr::LowerName::from(
+            dnsrr::Name::from_str("mainnet-test-seed.electriccoin.co").unwrap(),
+        ); // make me configurable
         if *request.query().name() != endpoint {
             let response = MessageResponseBuilder::from_message_request(request);
-            return Some(response_handle.send_response(response.error_msg(request.header(), dnsop::ResponseCode::NXDomain)).await.unwrap());
+            return Some(
+                response_handle
+                    .send_response(
+                        response.error_msg(request.header(), dnsop::ResponseCode::NXDomain),
+                    )
+                    .await
+                    .unwrap(),
+            );
         }
 
         let builder = MessageResponseBuilder::from_message_request(request);
@@ -142,7 +174,7 @@ impl DnsContext {
                                     dnsrr::RData::A(ipv4),
                                 ))
                             }
-                        },
+                        }
                         dnsrr::RecordType::AAAA => {
                             if let IpAddr::V6(ipv6) = peer.ip() {
                                 records.push(dnsrr::Record::from_rdata(
@@ -152,7 +184,7 @@ impl DnsContext {
                                 ))
                             }
                         }
-                    _ => {} // if the query is something other than A or AAAA, we'll have no records in the reply, and that means a NODATA
+                        _ => {} // if the query is something other than A or AAAA, we'll have no records in the reply, and that means a NODATA
                     }
                 }
             }
@@ -207,7 +239,6 @@ static REQUIRED_TESTNET_HEIGHT: LazyLock<Height> = LazyLock::new(|| {
     checkpoint.max_height()
 });
 
-
 static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     let checkpoint = CheckpointList::new(Network::Testnet);
     let mut proband_heights = HashSet::new();
@@ -233,7 +264,6 @@ static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     proband_hashes
 });
 
-
 // TCPFailure errors:
 // Os { code: 60, kind: TimedOut, message: "Operation timed out" }
 // Os { code: 61, kind: ConnectionRefused, message: "Connection refused" }
@@ -245,8 +275,6 @@ static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
 
 // Serialization(Io(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }))
 
-
-
 // ProtocolBad errors
 // it's possible some of the TCPFailure errors indicate a protocol problem but we want to avoid false positives
 // Serialization(Parse("getblocks version did not match negotiation"))
@@ -257,9 +285,6 @@ static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
 // MustRetry errors:
 // Os { code: 49, kind: AddrNotAvailable, message: "Can't assign requested address" }
 
-
-
-
 #[derive(Debug, Clone)]
 enum ErrorFlavor {
     Network(String),
@@ -267,15 +292,10 @@ enum ErrorFlavor {
     Protocol(String),
 }
 
-
 fn classify_zebra_network_errors(
-    returned_error:
-    &Box<dyn std::error::Error + std::marker::Send + Sync>
-    ) -> ErrorFlavor
-{
-    if let Some(io_error) =
-        returned_error.downcast_ref::<std::io::Error>()
-    {
+    returned_error: &Box<dyn std::error::Error + std::marker::Send + Sync>,
+) -> ErrorFlavor {
+    if let Some(io_error) = returned_error.downcast_ref::<std::io::Error>() {
         return match io_error.kind() {
             std::io::ErrorKind::Uncategorized      => {ErrorFlavor::Ephemeral("Uncategorized Io error. Perhaps EMFILES / ENFILES, consider increasing ulimit -n hard limit".to_string())}
             std::io::ErrorKind::AddrNotAvailable   => {ErrorFlavor::Ephemeral("AddrNotAvailable Io error. Consider increasing ephemeral port range or decreasing number of maximum concurrent connections".to_string())}
@@ -285,17 +305,18 @@ fn classify_zebra_network_errors(
             std::io::ErrorKind::AlreadyExists      => {ErrorFlavor::Ephemeral("AlreadyExists Io error. Consider increasing ephemeral port range, increasing ulimit -n hard limit, or decreasing number of maximum concurrent connections".to_string())}
 
             _                                      => {ErrorFlavor::Network(format!("IO error: {:?}", io_error))}
-        }
+        };
     }
     if returned_error.is::<tower::timeout::error::Elapsed>()
         || returned_error.is::<tokio::time::error::Elapsed>()
     {
-        return ErrorFlavor::Network(format!("zebra-network timed out during handshake: {:?}", returned_error))
+        return ErrorFlavor::Network(format!(
+            "zebra-network timed out during handshake: {:?}",
+            returned_error
+        ));
     }
 
-    if let Some(handshake_error) =
-        returned_error.downcast_ref::<zebra_network::HandshakeError>()
-    {
+    if let Some(handshake_error) = returned_error.downcast_ref::<zebra_network::HandshakeError>() {
         return match handshake_error {
             // absolutely ProtocolBad.
             // no way the network could have caused these.
@@ -335,10 +356,16 @@ fn classify_zebra_network_errors(
                     }
                 }
             }
-        }
+        };
     }
-    println!("RAN INTO MYSTERY ERROR WE CAN'T CLASSIFY: {:?}", returned_error);
-    ErrorFlavor::Ephemeral(format!("Mysterious error we can't classify: {:?}", returned_error))
+    println!(
+        "RAN INTO MYSTERY ERROR WE CAN'T CLASSIFY: {:?}",
+        returned_error
+    );
+    ErrorFlavor::Ephemeral(format!(
+        "Mysterious error we can't classify: {:?}",
+        returned_error
+    ))
 }
 
 async fn hash_probe_inner(
@@ -346,7 +373,10 @@ async fn hash_probe_inner(
     network: Network,
     connection_timeout: Duration,
 ) -> BlockProbeResult {
-    println!("Starting new hash probe connection: peer addr is {:?}", peer_addr);
+    println!(
+        "Starting new hash probe connection: peer addr is {:?}",
+        peer_addr
+    );
     let connection = connect_isolated_tcp_direct(
         network,
         peer_addr,
@@ -357,7 +387,7 @@ async fn hash_probe_inner(
 
     let hash_checkpoints = match network {
         Network::Mainnet => HASH_CHECKPOINTS_MAINNET.clone(),
-        Network::Testnet => HASH_CHECKPOINTS_TESTNET.clone()
+        Network::Testnet => HASH_CHECKPOINTS_TESTNET.clone(),
     };
 
     match connection {
@@ -375,15 +405,24 @@ async fn hash_probe_inner(
 
                     match error_classification {
                         ErrorFlavor::Ephemeral(msg) => {
-                            println!("Hash test connection with {:?} got an ephemeral error: {:?}", peer_addr, msg);
+                            println!(
+                                "Hash test connection with {:?} got an ephemeral error: {:?}",
+                                peer_addr, msg
+                            );
                             BlockProbeResult::MustRetry
                         }
                         ErrorFlavor::Network(msg) => {
-                            println!("Hash test connection with {:?} got an network error: {:?}", peer_addr, msg);
+                            println!(
+                                "Hash test connection with {:?} got an network error: {:?}",
+                                peer_addr, msg
+                            );
                             BlockProbeResult::TCPFailure
                         }
                         ErrorFlavor::Protocol(msg) => {
-                            println!("Hash test connection with {:?} got an protocol error: {:?}", peer_addr, msg);
+                            println!(
+                                "Hash test connection with {:?} got an protocol error: {:?}",
+                                peer_addr, msg
+                            );
                             BlockProbeResult::ProtocolBad
                         }
                     }
@@ -453,8 +492,6 @@ async fn hash_probe_inner(
     }
 }
 
-
-
 async fn probe_for_peers_two(
     peer_addr: SocketAddr,
     network: Network,
@@ -462,7 +499,10 @@ async fn probe_for_peers_two(
     random_delay: Duration,
 ) -> (SocketAddr, ProbeResult) {
     sleep(random_delay).await;
-    println!("Starting peer probe connection: peer addr is {:?}", peer_addr);
+    println!(
+        "Starting peer probe connection: peer addr is {:?}",
+        peer_addr
+    );
     let connection = connect_isolated_tcp_direct(
         network,
         peer_addr,
@@ -479,44 +519,53 @@ async fn probe_for_peers_two(
             );
             return (peer_addr, ProbeResult::PeersFail);
         }
-        Ok(connection_might_have_failed) => {
-            match connection_might_have_failed {
-                Err(connection_failure) => {
-                    let error_classification = classify_zebra_network_errors(&connection_failure);
+        Ok(connection_might_have_failed) => match connection_might_have_failed {
+            Err(connection_failure) => {
+                let error_classification = classify_zebra_network_errors(&connection_failure);
 
-                    match error_classification {
-                        ErrorFlavor::Ephemeral(msg) => {
-                            println!("Peer probe connection with {:?} got an ephemeral error: {:?}", peer_addr, msg);
-                            (peer_addr, ProbeResult::MustRetryPeersResult)
-                        }
-                        ErrorFlavor::Network(msg) => {
-                            println!("Peer probe connection with {:?} got an network error: {:?}", peer_addr, msg);
-                            (peer_addr, ProbeResult::PeersFail)
-                        }
-                        ErrorFlavor::Protocol(msg) => {
-                            println!("Peer probe connection with {:?} got an protocol error: {:?}", peer_addr, msg);
-                            (peer_addr, ProbeResult::PeersFail)
-                        }
+                match error_classification {
+                    ErrorFlavor::Ephemeral(msg) => {
+                        println!(
+                            "Peer probe connection with {:?} got an ephemeral error: {:?}",
+                            peer_addr, msg
+                        );
+                        (peer_addr, ProbeResult::MustRetryPeersResult)
                     }
-                }
-                Ok(mut good_connection) => {
-                    for _attempt in 0..2 {
-                        let peers_query_response = good_connection
-                            .call(Request::Peers)
-                            .await;
-                        if let Ok(zebra_network::Response::Peers(ref candidate_peers)) = peers_query_response {
-                            if candidate_peers.len() > 1 {
-                                return (peer_addr, ProbeResult::PeersResult(candidate_peers.to_vec()));
-                            }
-                        }
+                    ErrorFlavor::Network(msg) => {
+                        println!(
+                            "Peer probe connection with {:?} got an network error: {:?}",
+                            peer_addr, msg
+                        );
+                        (peer_addr, ProbeResult::PeersFail)
                     }
-                    return (peer_addr, ProbeResult::PeersFail);
+                    ErrorFlavor::Protocol(msg) => {
+                        println!(
+                            "Peer probe connection with {:?} got an protocol error: {:?}",
+                            peer_addr, msg
+                        );
+                        (peer_addr, ProbeResult::PeersFail)
+                    }
                 }
             }
-        }
+            Ok(mut good_connection) => {
+                for _attempt in 0..2 {
+                    let peers_query_response = good_connection.call(Request::Peers).await;
+                    if let Ok(zebra_network::Response::Peers(ref candidate_peers)) =
+                        peers_query_response
+                    {
+                        if candidate_peers.len() > 1 {
+                            return (
+                                peer_addr,
+                                ProbeResult::PeersResult(candidate_peers.to_vec()),
+                            );
+                        }
+                    }
+                }
+                return (peer_addr, ProbeResult::PeersFail);
+            }
+        },
     }
 }
-
 
 //Connection with 74.208.91.217:8233 failed: Serialization(Parse("getblocks version did not match negotiation"))
 
@@ -527,7 +576,6 @@ struct EWMAState {
     count: f64,
     reliability: f64,
 }
-
 
 #[derive(Debug, Clone)]
 enum BlockProbeResult {
@@ -547,7 +595,6 @@ enum BlockProbeResult {
     BlockRequestOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotations_ok and valid_block_reply_ok
 }
 
-
 #[derive(Debug, Clone)]
 struct PeerStats {
     total_attempts: u64,
@@ -565,18 +612,24 @@ struct PeerStats {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PeerClassification {
     Unknown,               // We got told about this node but haven't yet queried it
-    BeyondUseless,         // We established a TCP connection, but protocol negotation has never worked. This probably isn't a Zcash or Zebra node.
-    GenericBad,            // We were able to establish a TCP connection, and the host is bad for a reason that doesn't make it BeyondUseless
+    BeyondUseless, // We established a TCP connection, but protocol negotation has never worked. This probably isn't a Zcash or Zebra node.
+    GenericBad, // We were able to establish a TCP connection, and the host is bad for a reason that doesn't make it BeyondUseless
     EventuallyMaybeSynced, // This looks like it could be a good node once it's synced enough, so poll it more often so it graduates earlier
-    MerelySyncedEnough,    // In the past 2 hours, this node served us a recent-enough block (synced-enough to the zcash chain) but doesn't meet uptime criteria
-    AllGood,               // Node meets all the legacy criteria (including uptime), can serve a recent-enough block
+    MerelySyncedEnough, // In the past 2 hours, this node served us a recent-enough block (synced-enough to the zcash chain) but doesn't meet uptime criteria
+    AllGood, // Node meets all the legacy criteria (including uptime), can serve a recent-enough block
 }
 
-
-fn ancillary_checks_all_good(peer_derived_data: &PeerDerivedData, peer_address: &SocketAddr, peer_stats: &PeerStats, network: Network) -> PeerClassification {
-    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) ||
-            peer_derived_data.numeric_version < required_serving_version(network) ||
-            peer_derived_data.peer_height < required_height(network)
+fn ancillary_checks_all_good(
+    peer_derived_data: &PeerDerivedData,
+    peer_address: &SocketAddr,
+    peer_stats: &PeerStats,
+    network: Network,
+) -> PeerClassification {
+    if !peer_derived_data
+        .peer_services
+        .intersects(PeerServices::NODE_NETWORK)
+        || peer_derived_data.numeric_version < required_serving_version(network)
+        || peer_derived_data.peer_height < required_height(network)
     {
         println!("Classifying node {:?} as GenericBad despite meeting other AllGood criteria. PeerStats: {:?}", peer_address, peer_stats);
         return PeerClassification::GenericBad;
@@ -585,10 +638,17 @@ fn ancillary_checks_all_good(peer_derived_data: &PeerDerivedData, peer_address: 
     }
 }
 
-fn ancillary_checks_merely_synced(peer_derived_data: &PeerDerivedData, peer_address: &SocketAddr, peer_stats: &PeerStats, network: Network) -> PeerClassification {
-    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) ||
-            peer_derived_data.numeric_version < required_serving_version(network) ||
-            peer_derived_data.peer_height < required_height(network)
+fn ancillary_checks_merely_synced(
+    peer_derived_data: &PeerDerivedData,
+    peer_address: &SocketAddr,
+    peer_stats: &PeerStats,
+    network: Network,
+) -> PeerClassification {
+    if !peer_derived_data
+        .peer_services
+        .intersects(PeerServices::NODE_NETWORK)
+        || peer_derived_data.numeric_version < required_serving_version(network)
+        || peer_derived_data.peer_height < required_height(network)
     {
         println!("Classifying node {:?} as GenericBad despite meeting other MerelySyncedEnough criteria. PeerStats: {:?}", peer_address, peer_stats);
         return PeerClassification::GenericBad;
@@ -597,9 +657,16 @@ fn ancillary_checks_merely_synced(peer_derived_data: &PeerDerivedData, peer_addr
     }
 }
 
-fn ancillary_checks_eventually_maybe_synced(peer_derived_data: &PeerDerivedData, peer_address: &SocketAddr, peer_stats: &PeerStats, network: Network) -> PeerClassification {
-    if !peer_derived_data.peer_services.intersects(PeerServices::NODE_NETWORK) ||
-            peer_derived_data.numeric_version < required_serving_version(network)
+fn ancillary_checks_eventually_maybe_synced(
+    peer_derived_data: &PeerDerivedData,
+    peer_address: &SocketAddr,
+    peer_stats: &PeerStats,
+    network: Network,
+) -> PeerClassification {
+    if !peer_derived_data
+        .peer_services
+        .intersects(PeerServices::NODE_NETWORK)
+        || peer_derived_data.numeric_version < required_serving_version(network)
     {
         println!("Classifying node {:?} as GenericBad despite meeting other EventuallyMaybeSynced criteria. PeerStats: {:?}", peer_address, peer_stats);
         return PeerClassification::GenericBad;
@@ -607,7 +674,6 @@ fn ancillary_checks_eventually_maybe_synced(peer_derived_data: &PeerDerivedData,
         return PeerClassification::EventuallyMaybeSynced;
     }
 }
-
 
 // long term goal: add config options that look like:
 // all_good_tests = numeric_version | peer_height
@@ -639,10 +705,10 @@ fn get_classification(
         // for EventuallyMaybeSynced, we need to have passed (peer_services test, numeric version test) in 24 hours, but peer_height test can fail
         // otherwise, we give a GenericBad
 
-
         // AllGood test section
         let ewmas = peer_stats.ewma_pack;
-        if peer_stats.total_attempts <= 3 && peer_stats.valid_block_reply_ok * 2 >= peer_stats.total_attempts
+        if peer_stats.total_attempts <= 3
+            && peer_stats.valid_block_reply_ok * 2 >= peer_stats.total_attempts
         {
             return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
@@ -662,35 +728,41 @@ fn get_classification(
             return ancillary_checks_all_good(peer_derived_data, peer_address, peer_stats, network);
         }
 
-
         // MerelySyncedEnough test section
         // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
         if let Some(last_block_success) = peer_stats.last_block_success {
             if let Ok(duration) = last_block_success.elapsed() {
                 if duration <= Duration::from_secs(60 * 60 * 2) {
-                    return ancillary_checks_merely_synced(peer_derived_data, peer_address, peer_stats, network);
+                    return ancillary_checks_merely_synced(
+                        peer_derived_data,
+                        peer_address,
+                        peer_stats,
+                        network,
+                    );
                 }
             }
         }
-
 
         // EventuallyMaybeSynced test section
         // if last protocol negotiation was more than 24 hours ago, this is not worth special attention, keep polling it at the slower rate
         if let Some(last_protocol_negotiation) = peer_stats.last_protocol_negotiation {
             if let Ok(duration) = last_protocol_negotiation.elapsed() {
                 if duration <= Duration::from_secs(60 * 60 * 24) {
-                    return ancillary_checks_eventually_maybe_synced(peer_derived_data, peer_address, peer_stats, network);
+                    return ancillary_checks_eventually_maybe_synced(
+                        peer_derived_data,
+                        peer_address,
+                        peer_stats,
+                        network,
+                    );
                 }
             }
         }
 
-
         // GenericBad test section
         println!("classifying node {:?} with PeerStats {:?} as GenericBad despite having negotiated wire protocol: {:?}", peer_address, peer_stats, peer_derived_data);
         return PeerClassification::GenericBad;
-
-
-    } else { // never were able to negotiate the wire protocol
+    } else {
+        // never were able to negotiate the wire protocol
         if peer_stats.tcp_connections_ok > 10 {
             // at least 10 TCP connections succeeded, but never been able to negotiate the Zcash protocol
             // this isn't a zcash node and isn't going to turn into one any time soon
@@ -800,14 +872,20 @@ fn poll_this_time_around(
             )
         }
         PeerClassification::GenericBad => {
-            println!("node {:?} is GenericBad, we try it again in 2 hours", peer_address);
+            println!(
+                "node {:?} is GenericBad, we try it again in 2 hours",
+                peer_address
+            );
             peer_last_polled_comparison(
                 peer_stats.as_ref().unwrap(),
                 Duration::from_secs(2 * 60 * 60), // 2 hours
             )
         }
         PeerClassification::EventuallyMaybeSynced => {
-            println!("node {:?} is GenericBad, we try it again in 1 hour", peer_address);
+            println!(
+                "node {:?} is GenericBad, we try it again in 1 hour",
+                peer_address
+            );
             peer_last_polled_comparison(
                 peer_stats.as_ref().unwrap(),
                 Duration::from_secs(1 * 60 * 60), // 2 hours
@@ -817,22 +895,30 @@ fn poll_this_time_around(
             println!(
                 "node {:?} is MerelySyncedEnough, we try it again in {:?}",
                 peer_address,
-                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap()))
+                Duration::from_secs(exponential_acquisition_threshold_secs(
+                    peer_stats.as_ref().unwrap()
+                ))
             );
             peer_last_polled_comparison(
                 peer_stats.as_ref().unwrap(),
-                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap()))
+                Duration::from_secs(exponential_acquisition_threshold_secs(
+                    peer_stats.as_ref().unwrap(),
+                )),
             )
         }
         PeerClassification::AllGood => {
             println!(
                 "node {:?} is AllGood, we try it again in {:?}",
                 peer_address,
-                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap()))
+                Duration::from_secs(exponential_acquisition_threshold_secs(
+                    peer_stats.as_ref().unwrap()
+                ))
             );
             peer_last_polled_comparison(
                 peer_stats.as_ref().unwrap(),
-                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap()))
+                Duration::from_secs(exponential_acquisition_threshold_secs(
+                    peer_stats.as_ref().unwrap(),
+                )),
             )
         }
     }
@@ -857,7 +943,6 @@ fn exponential_acquisition_threshold_secs(peer_stats: &PeerStats) -> u64 {
         32 * 60
     }
 }
-
 
 fn required_height(network: Network) -> Height {
     match network {
@@ -889,7 +974,7 @@ async fn main() {
     }
     let max_inflight_conn = match getrlimit(Resource::NOFILE) {
         Ok((softlimit, _hardlimit)) => softlimit.min(4096), // limit it to avoid hurting NAT middleboxes
-        _ => 128,                              // if we can't figure it out, play it really safe
+        _ => 128, // if we can't figure it out, play it really safe
     };
 
     let network = Network::Mainnet;
@@ -914,7 +999,11 @@ async fn main() {
     dns_server.register_socket(UdpSocket::bind(dns_socket).await.unwrap());
     tokio::spawn(dns_server.block_until_done());
 
-    let initial_peer_addrs = ["20.47.97.70:8233", "51.79.229.21:8233", "34.73.242.102:8233"]; //, "51.77.64.61:8233", "18.117.148.170:8233", "85.15.179.171:8233", "18.189.228.115:8233", "139.99.123.157:8233", "3.72.134.66:8233", "157.90.89.105:9058", "142.132.202.124:8836", "51.81.154.19:30834", "147.135.11.134:8233", "37.59.32.10:8233", "78.46.46.252:8233", "116.62.229.19:8233", "51.178.76.85:8836", "176.34.40.41:8233", "162.55.103.190:8233", "135.181.79.230:8233", "209.141.47.197:8233", "51.222.245.186:8233", "8.218.10.114:8233", "94.156.174.100:8233", "88.80.148.28:8233", "144.76.112.237:8233", "51.81.184.90:30834", "51.195.234.88:2838", "144.217.11.155:8233", "65.108.220.35:8233", "51.77.64.59:8233", "91.199.137.99:8233", "88.198.48.91:8233", "18.217.102.40:8233", "34.255.6.39:5001", "91.206.16.214:8233", "109.190.117.131:8233", "65.21.137.242:8233", "8.219.76.216:8233", "203.96.179.202:8233", "51.210.114.183:8836", "13.231.190.41:8233", "162.19.139.181:8233", "65.108.41.222:20005", "62.210.69.194:8233", "135.181.18.180:8233", "51.195.63.10:30834", "95.217.78.170:8233", "51.79.57.29:8233", "178.234.34.18:8233", "47.242.184.215:8233", "141.95.45.187:30834", "8.218.11.43:8233", "162.19.139.183:8235", "142.132.212.130:8836", "47.90.209.31:8233", "157.90.88.178:9058", "23.129.64.30:8233", "104.207.139.34:8233", "162.19.139.182:8233", "135.148.55.16:8233", "84.75.28.247:8233", "46.249.236.211:8233", "47.242.8.170:8233", "44.197.66.202:8233", "73.172.228.152:8233", "51.210.216.76:8836", "165.232.125.107:8233", "194.135.81.61:8233", "50.7.29.20:8233", "52.28.203.21:8233", "8.214.158.97:8233", "51.210.208.201:8836", "221.223.25.99:2331", "54.229.33.6:5001", "104.233.147.162:8233", "116.203.188.195:8233", "124.126.140.40:2331", "51.79.230.103:8233", "47.229.106.87:8233", "35.72.109.227:8233", "47.89.158.145:8233", "162.19.139.183:8233", "3.16.30.39:8233", "23.88.71.118:8233", "65.21.40.28:8233", "46.4.192.189:8233", "173.212.197.63:8233", "15.235.85.30:8233", "51.77.64.51:8233", "7.252.44.174:8233", "3.252.40.246:5001", "8.209.80.185:8233", "8.209.65.101:8233", "51.210.220.135:8836", "35.91.16.78:8233", "162.19.136.65:30834", "161.97.155.203:8233", "120.24.79.67:8233", "195.201.111.115:8233", "23.16.98.249:8233", "51.210.216.77:8836", "116.202.53.174:8533", "35.233.224.178:8233", "51.222.254.36:8233", "97.119.97.142:8233", "5.9.74.158:8233", "8.210.73.119:8233", "116.202.170.226:8233", "51.81.184.89:30834", "51.178.76.73:8836", "54.67.54.98:8233", "51.210.208.202:8836", "5.2.75.10:8233", "168.119.147.118:8233", "65.108.41.222:21005", "47.243.196.68:8233", "54.238.23.140:8233", "64.201.122.142:54324", "54.145.30.137:8233", "54.36.61.123:8233"];
+    let initial_peer_addrs = [
+        "20.47.97.70:8233",
+        "51.79.229.21:8233",
+        "34.73.242.102:8233",
+    ]; //, "51.77.64.61:8233", "18.117.148.170:8233", "85.15.179.171:8233", "18.189.228.115:8233", "139.99.123.157:8233", "3.72.134.66:8233", "157.90.89.105:9058", "142.132.202.124:8836", "51.81.154.19:30834", "147.135.11.134:8233", "37.59.32.10:8233", "78.46.46.252:8233", "116.62.229.19:8233", "51.178.76.85:8836", "176.34.40.41:8233", "162.55.103.190:8233", "135.181.79.230:8233", "209.141.47.197:8233", "51.222.245.186:8233", "8.218.10.114:8233", "94.156.174.100:8233", "88.80.148.28:8233", "144.76.112.237:8233", "51.81.184.90:30834", "51.195.234.88:2838", "144.217.11.155:8233", "65.108.220.35:8233", "51.77.64.59:8233", "91.199.137.99:8233", "88.198.48.91:8233", "18.217.102.40:8233", "34.255.6.39:5001", "91.206.16.214:8233", "109.190.117.131:8233", "65.21.137.242:8233", "8.219.76.216:8233", "203.96.179.202:8233", "51.210.114.183:8836", "13.231.190.41:8233", "162.19.139.181:8233", "65.108.41.222:20005", "62.210.69.194:8233", "135.181.18.180:8233", "51.195.63.10:30834", "95.217.78.170:8233", "51.79.57.29:8233", "178.234.34.18:8233", "47.242.184.215:8233", "141.95.45.187:30834", "8.218.11.43:8233", "162.19.139.183:8235", "142.132.212.130:8836", "47.90.209.31:8233", "157.90.88.178:9058", "23.129.64.30:8233", "104.207.139.34:8233", "162.19.139.182:8233", "135.148.55.16:8233", "84.75.28.247:8233", "46.249.236.211:8233", "47.242.8.170:8233", "44.197.66.202:8233", "73.172.228.152:8233", "51.210.216.76:8836", "165.232.125.107:8233", "194.135.81.61:8233", "50.7.29.20:8233", "52.28.203.21:8233", "8.214.158.97:8233", "51.210.208.201:8836", "221.223.25.99:2331", "54.229.33.6:5001", "104.233.147.162:8233", "116.203.188.195:8233", "124.126.140.40:2331", "51.79.230.103:8233", "47.229.106.87:8233", "35.72.109.227:8233", "47.89.158.145:8233", "162.19.139.183:8233", "3.16.30.39:8233", "23.88.71.118:8233", "65.21.40.28:8233", "46.4.192.189:8233", "173.212.197.63:8233", "15.235.85.30:8233", "51.77.64.51:8233", "7.252.44.174:8233", "3.252.40.246:5001", "8.209.80.185:8233", "8.209.65.101:8233", "51.210.220.135:8836", "35.91.16.78:8233", "162.19.136.65:30834", "161.97.155.203:8233", "120.24.79.67:8233", "195.201.111.115:8233", "23.16.98.249:8233", "51.210.216.77:8836", "116.202.53.174:8533", "35.233.224.178:8233", "51.222.254.36:8233", "97.119.97.142:8233", "5.9.74.158:8233", "8.210.73.119:8233", "116.202.170.226:8233", "51.81.184.89:30834", "51.178.76.73:8836", "54.67.54.98:8233", "51.210.208.202:8836", "5.2.75.10:8233", "168.119.147.118:8233", "65.108.41.222:21005", "47.243.196.68:8233", "54.238.23.140:8233", "64.201.122.142:54324", "54.145.30.137:8233", "54.36.61.123:8233"];
     let mut internal_peer_tracker: HashMap<SocketAddr, Option<PeerStats>> = HashMap::new();
 
     for peer in initial_peer_addrs {
@@ -942,8 +1031,15 @@ async fn main() {
                 .await;
                 {
                     let serving_nodes_testing = serving_nodes_shared.read().unwrap();
-                    if serving_nodes_testing.primaries.len() + serving_nodes_testing.alternates.len() > 32 {
-                        println!("SWITCHING TO SLOW WALKER, we are serving a total of {:?} nodes", serving_nodes_testing.primaries.len() + serving_nodes_testing.alternates.len());
+                    if serving_nodes_testing.primaries.len()
+                        + serving_nodes_testing.alternates.len()
+                        > 32
+                    {
+                        println!(
+                            "SWITCHING TO SLOW WALKER, we are serving a total of {:?} nodes",
+                            serving_nodes_testing.primaries.len()
+                                + serving_nodes_testing.alternates.len()
+                        );
                         mode = CrawlingMode::LongTermUpdates;
                     }
                 }
@@ -961,7 +1057,7 @@ async fn main() {
                     network,
                     max_inflight_conn.try_into().unwrap(),
                     timeouts,
-                    128
+                    128,
                 )
                 .await;
             }
@@ -1005,8 +1101,7 @@ fn single_node_update(
     new_peer_address: &SocketAddr,
     new_peer_stat: &Option<PeerStats>,
 ) {
-    if new_peer_address.ip().is_global()
-    {
+    if new_peer_address.ip().is_global() {
         let old_nodes = serving_nodes_shared.read().unwrap();
         let mut primary_nodes = old_nodes.primaries.clone();
         let mut alternate_nodes = old_nodes.alternates.clone();
@@ -1081,12 +1176,12 @@ async fn hash_probe_and_update(
             return (proband_address, ProbeResult::MustRetryHashResult);
         }
         BlockProbeResult::TCPFailure => {
-            new_peer_stats.total_attempts           += 1;
-            new_peer_stats.tcp_connections_ok       += 0;
+            new_peer_stats.total_attempts += 1;
+            new_peer_stats.tcp_connections_ok += 0;
             new_peer_stats.protocol_negotiations_ok += 0;
-            new_peer_stats.valid_block_reply_ok     += 0;
+            new_peer_stats.valid_block_reply_ok += 0;
 
-            new_peer_stats.last_polled               = Some(current_poll_time);
+            new_peer_stats.last_polled = Some(current_poll_time);
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -1096,12 +1191,12 @@ async fn hash_probe_and_update(
             );
         }
         BlockProbeResult::ProtocolBad => {
-            new_peer_stats.total_attempts           += 1;
-            new_peer_stats.tcp_connections_ok       += 1;
+            new_peer_stats.total_attempts += 1;
+            new_peer_stats.tcp_connections_ok += 1;
             new_peer_stats.protocol_negotiations_ok += 0;
-            new_peer_stats.valid_block_reply_ok     += 0;
+            new_peer_stats.valid_block_reply_ok += 0;
 
-            new_peer_stats.last_polled               = Some(current_poll_time);
+            new_peer_stats.last_polled = Some(current_poll_time);
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -1111,13 +1206,12 @@ async fn hash_probe_and_update(
             );
         }
         BlockProbeResult::BlockRequestFail(new_peer_data) => {
-
-            new_peer_stats.total_attempts           += 1;
-            new_peer_stats.tcp_connections_ok       += 1;
+            new_peer_stats.total_attempts += 1;
+            new_peer_stats.tcp_connections_ok += 1;
             new_peer_stats.protocol_negotiations_ok += 1;
-            new_peer_stats.valid_block_reply_ok     += 0;
+            new_peer_stats.valid_block_reply_ok += 0;
 
-            new_peer_stats.last_polled               = Some(current_poll_time);
+            new_peer_stats.last_polled = Some(current_poll_time);
             new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
@@ -1130,14 +1224,14 @@ async fn hash_probe_and_update(
             );
         }
         BlockProbeResult::BlockRequestOK(new_peer_data) => {
-            new_peer_stats.total_attempts           += 1;
-            new_peer_stats.tcp_connections_ok       += 1;
+            new_peer_stats.total_attempts += 1;
+            new_peer_stats.tcp_connections_ok += 1;
             new_peer_stats.protocol_negotiations_ok += 1;
-            new_peer_stats.valid_block_reply_ok     += 1;
+            new_peer_stats.valid_block_reply_ok += 1;
 
-            new_peer_stats.last_polled               = Some(current_poll_time);
+            new_peer_stats.last_polled = Some(current_poll_time);
             new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
-            new_peer_stats.last_block_success        = Some(current_poll_time);
+            new_peer_stats.last_block_success = Some(current_poll_time);
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
 
@@ -1166,17 +1260,19 @@ async fn slow_walker(
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
         if poll_this_time_around(peer_stat, proband_address, network) {
             batch_queries.push(Box::pin(hash_probe_and_update(
-            proband_address.clone(),
-            peer_stat.clone(),
-            network,
-            &timeouts,
-            Duration::from_secs(rng.gen_range(0..smear_cap))),
-                ) as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
+                proband_address.clone(),
+                peer_stat.clone(),
+                network,
+                &timeouts,
+                Duration::from_secs(rng.gen_range(0..smear_cap)),
+            ))
+                as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
             batch_queries.push(Box::pin(probe_for_peers_two(
                 proband_address.clone(),
                 network,
                 &timeouts,
-                Duration::from_secs(rng.gen_range(0..smear_cap)))))
+                Duration::from_secs(rng.gen_range(0..smear_cap)),
+            )))
         } else {
             println!(
                 "NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY",
@@ -1193,12 +1289,16 @@ async fn slow_walker(
             ProbeResult::HashResult(new_peer_stat) => {
                 println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
                 internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
-                single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat.clone()));
+                single_node_update(
+                    &serving_nodes_shared,
+                    &peer_address,
+                    &Some(new_peer_stat.clone()),
+                );
                 println!("HashMap len: {:?}", internal_peer_tracker.len());
-            },
+            }
             ProbeResult::MustRetryHashResult => {
                 println!("Slow Walker probing {:?} for hashes failed due to too many open sockets, this should NOT HAPPEN", peer_address);
-            },
+            }
             ProbeResult::PeersResult(new_peers) => {
                 for peer in new_peers {
                     let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
@@ -1207,17 +1307,19 @@ async fn slow_walker(
                         internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
                     }
                 }
-            },
+            }
             ProbeResult::PeersFail => {
-                println!("Slow Walker probing {:?} for peers failed, will be retried next time around", peer_address);
-            },
+                println!(
+                    "Slow Walker probing {:?} for peers failed, will be retried next time around",
+                    peer_address
+                );
+            }
             ProbeResult::MustRetryPeersResult => {
                 println!("Slow Walker probing {:?} for peers failed due to too many open sockets, this should NOT HAPPEN", peer_address);
-            },
+            }
         }
     }
 }
-
 
 async fn fast_walker(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
@@ -1234,13 +1336,15 @@ async fn fast_walker(
             peer_stat.clone(),
             network,
             &timeouts,
-            Duration::from_secs(rng.gen_range(0..smear_cap))),
-        ) as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
+            Duration::from_secs(rng.gen_range(0..smear_cap)),
+        ))
+            as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
         handles.push(Box::pin(probe_for_peers_two(
             proband_address.clone(),
             network,
             &timeouts,
-            Duration::from_secs(rng.gen_range(0..smear_cap)))));
+            Duration::from_secs(rng.gen_range(0..smear_cap)),
+        )));
     }
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
@@ -1248,9 +1352,13 @@ async fn fast_walker(
             ProbeResult::HashResult(new_peer_stat) => {
                 println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
                 internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
-                single_node_update(&serving_nodes_shared, &peer_address, &Some(new_peer_stat.clone()));
+                single_node_update(
+                    &serving_nodes_shared,
+                    &peer_address,
+                    &Some(new_peer_stat.clone()),
+                );
                 println!("HashMap len: {:?}", internal_peer_tracker.len());
-            },
+            }
             ProbeResult::MustRetryHashResult => {
                 // we gotta retry
                 println!("Retrying hash probe for {:?}", peer_address);
@@ -1261,12 +1369,15 @@ async fn fast_walker(
                     &timeouts,
                     Duration::from_secs(rng.gen_range(0..smear_cap)),
                 )));
-            },
+            }
             ProbeResult::PeersResult(new_peers) => {
                 for peer in new_peers {
                     let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
                     if !internal_peer_tracker.contains_key(&key) {
-                        println!("Probing {:?} yielded new peer {:?}, adding to work queue", peer_address, key);
+                        println!(
+                            "Probing {:?} yielded new peer {:?}, adding to work queue",
+                            peer_address, key
+                        );
                         internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
                         handles.push(Box::pin(hash_probe_and_update(
                             key.clone(),
@@ -1279,22 +1390,23 @@ async fn fast_walker(
                             key.clone(),
                             network,
                             &timeouts,
-                            Duration::from_secs(rng.gen_range(0..smear_cap)))));
+                            Duration::from_secs(rng.gen_range(0..smear_cap)),
+                        )));
                     }
                 }
-            },
+            }
             ProbeResult::PeersFail => {
                 println!("probing {:?} for peers failed, not retrying", peer_address);
-            },
+            }
             ProbeResult::MustRetryPeersResult => {
                 println!("Retrying peers probe for {:?}", peer_address);
                 handles.push(Box::pin(probe_for_peers_two(
                     peer_address.clone(),
                     network,
                     &timeouts,
-                    Duration::from_secs(rng.gen_range(0..smear_cap)))));
-            },
+                    Duration::from_secs(rng.gen_range(0..smear_cap)),
+                )));
+            }
         }
-
     }
 }
