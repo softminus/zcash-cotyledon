@@ -920,7 +920,7 @@ async fn main() {
                 .await;
                 {
                     let serving_nodes_testing = serving_nodes_shared.read().unwrap();
-                    if serving_nodes_testing.primaries.len() + serving_nodes_testing.alternates.len() > 32 {
+                    if serving_nodes_testing.primaries.len() + serving_nodes_testing.alternates.len() > 32000 {
                         println!("SWITCHING TO SLOW WALKER, we are serving a total of {:?} nodes", serving_nodes_testing.primaries.len() + serving_nodes_testing.alternates.len());
                         mode = CrawlingMode::LongTermUpdates;
                     }
