@@ -273,52 +273,40 @@ fn classify_zebra_network_errors(
     &Box<dyn std::error::Error + std::marker::Send + Sync>
     ) -> ErrorFlavor
 {
-    if let Some(decanisterized_error) =
-        connection_failure.downcast_ref::<std::io::Error>()
+    if let Some(io_error) =
+        returned_error.downcast_ref::<std::io::Error>()
     {
-        println!(
-            "IO error detected... decannisterizing: error = {:?}",
-            decanisterized_error);
-        // Connection with XXX.XXX.XXX.XXX:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
-        match decanisterized_error.kind() {
-            std::io::ErrorKind::Uncategorized      => {return BlockProbeResult::MustRetry;}
-            std::io::ErrorKind::AddrNotAvailable   => {return BlockProbeResult::MustRetry;}
-            std::io::ErrorKind::AddrInUse          => {return BlockProbeResult::MustRetry;}
-            std::io::ErrorKind::ResourceBusy       => {return BlockProbeResult::MustRetry;}
-            std::io::ErrorKind::NetworkDown        => {return BlockProbeResult::MustRetry;}
-            std::io::ErrorKind::AlreadyExists      => {return BlockProbeResult::MustRetry;}
+        return match io_error.kind() {
+            std::io::ErrorKind::Uncategorized      => {ErrorFlavor::Ephemeral("Uncategorized Io error. Perhaps EMFILES / ENFILES, consider increasing ulimit -n hard limit".to_string())}
+            std::io::ErrorKind::AddrNotAvailable   => {ErrorFlavor::Ephemeral("AddrNotAvailable Io error. Consider increasing ephemeral port range or decreasing number of maximum concurrent connections".to_string())}
+            std::io::ErrorKind::AddrInUse          => {ErrorFlavor::Ephemeral("AddrInUse Io error. Consider increasing ephemeral port range or decreasing number of maximum concurrent connections".to_string())}
+            std::io::ErrorKind::ResourceBusy       => {ErrorFlavor::Ephemeral("ResourceBusy Io error. Consider increasing ephemeral port range, increasing ulimit -n hard limit, or decreasing number of maximum concurrent connections".to_string())}
+            std::io::ErrorKind::NetworkDown        => {ErrorFlavor::Ephemeral("NetworkDown Io error".to_string())}
+            std::io::ErrorKind::AlreadyExists      => {ErrorFlavor::Ephemeral("AlreadyExists Io error. Consider increasing ephemeral port range, increasing ulimit -n hard limit, or decreasing number of maximum concurrent connections".to_string())}
 
-            std::io::ErrorKind::TimedOut           => {return BlockProbeResult::TCPFailure;}
-            std::io::ErrorKind::ConnectionRefused  => {return BlockProbeResult::TCPFailure;}
-            std::io::ErrorKind::HostUnreachable    => {return BlockProbeResult::TCPFailure;}
-            std::io::ErrorKind::NetworkUnreachable => {return BlockProbeResult::TCPFailure;}
-            _                                      => {return BlockProbeResult::TCPFailure;}
+            _                                      => {ErrorFlavor::Network(io_error.to_string())}
         }
     }
-    if connection_failure.is::<tower::timeout::error::Elapsed>()
-        || connection_failure.is::<tokio::time::error::Elapsed>()
+    if returned_error.is::<tower::timeout::error::Elapsed>()
+        || returned_error.is::<tokio::time::error::Elapsed>()
     {
-        println!("zebra-network error: connection with {:?} failed with an Elapsed-type error: {:?}", peer_addr, connection_failure);
-        return BlockProbeResult::TCPFailure;
+        return ErrorFlavor::Network(format!("zebra-network timed out during handshake: {:?}", returned_error))
     }
 
     if let Some(handshake_error) =
-        connection_failure.downcast_ref::<zebra_network::HandshakeError>()
+        returned_error.downcast_ref::<zebra_network::HandshakeError>()
     {
-        match handshake_error {
+        return match handshake_error {
             // absolutely ProtocolBad.
             // no way the network could have caused these.
             HandshakeError::UnexpectedMessage(msg)         => {
-                println!("zebra-network error: host {:?} violated protocol and gave us an unexpected message: {:?}", peer_addr, msg);
-                return BlockProbeResult::ProtocolBad;
+                ErrorFlavor::Protocol(format!("zebra-network error: host violated protocol and gave us an unexpected message: {:?}",  msg))
             }
             HandshakeError::NonceReuse                     => {
-                println!("zebra-network error: host {:?} violated protocol and reused a nonce.", peer_addr);
-                return BlockProbeResult::ProtocolBad;
+                ErrorFlavor::Protocol("zebra-network error: host violated protocol and reused a nonce".to_string())
             }
             HandshakeError::ObsoleteVersion(ver)           => {
-                println!("zebra-network error: host {:?} advertised obsolete version: {:?}", peer_addr, ver);
-                return BlockProbeResult::ProtocolBad
+                ErrorFlavor::Protocol(format!("zebra-network error: host tried to negotiate with obsolete version: {:?}", ver))
             }
 
 
@@ -326,16 +314,13 @@ fn classify_zebra_network_errors(
             // false-positive BeyondUseless determination, so we are nice and classify these as
             // TCPFailures
             HandshakeError::ConnectionClosed               => {
-                println!("zebra-network error: host {:?} closed connection unexpectedly.", peer_addr);
-                return BlockProbeResult::TCPFailure
+                ErrorFlavor::Network("zebra-network error: closed connection unexpectedly".to_string())
             }
             HandshakeError::Io(inner_io_error)             => {
-                println!("zebra-network error: host {:?} caused inner Io error during handshake: {:?}", peer_addr, inner_io_error);
-                return BlockProbeResult::TCPFailure
+                ErrorFlavor::Network(format!("zebra-network error: inner Io error during handshake: {:?}", inner_io_error))
             }
             HandshakeError::Timeout                        => {
-                println!("zebra-network error: host {:?} caused timeout during handshake", peer_addr);
-                return BlockProbeResult::TCPFailure
+                ErrorFlavor::Network("zebra-network error: timeout during handshake".to_string())
             }
 
             // this could go both ways -- if it's an Io error, we are nice and classify this as
@@ -343,20 +328,16 @@ fn classify_zebra_network_errors(
             HandshakeError::Serialization(inner_ser_error) => {
                 match inner_ser_error {
                     SerializationError::Io(inner_io_error) => {
-                        println!("zebra-network error: host {:?} caused inner Serialization error with an Io error within during handshake: {:?}", peer_addr, inner_io_error);
-                        return BlockProbeResult::TCPFailure;
+                        ErrorFlavor::Network(format!("zebra-network error: inner Serialization error with an Io error within during handshake: {:?}", inner_io_error))
                     }
-                    _ =>
-                        {
-                        println!("zebra-network error: host {:?} caused inner Serialization error during handshake: {:?}", peer_addr, inner_ser_error);
-                        return BlockProbeResult::ProtocolBad;
-                        }
+                    _ => {
+                        ErrorFlavor::Protocol(format!("zebra-network error: inner Serialization error during handshake: {:?}", inner_ser_error))
                     }
                 }
-            
+            }
         }
     }
-    return ErrorFlavor::Network("egg".to_string());
+    panic!("ABORTING! MYSTERY ERROR WE CAN'T HANDLE! {:?}", returned_error);
 }
 
 async fn hash_probe_inner(
@@ -396,7 +377,7 @@ async fn hash_probe_inner(
 
                     // need to differentiate between TCP connection failed (regular brokenness, should just be Bad)
                     // and "tcp connection established, but zebra-network gave us protocol-level errors", which is protocol brokenness -- should be BeyondUseless
-//                    BlockProbeResult::TCPFailure // need to differentiate between network brokenness and protocol brokenness; only the latter should provoke a BeyondUseless categorization
+                    BlockProbeResult::TCPFailure // need to differentiate between network brokenness and protocol brokenness; only the latter should provoke a BeyondUseless categorization
                 }
                 Ok(mut good_connection) => {
                     let numeric_version = good_connection.connection_info.remote.version;
