@@ -11,8 +11,8 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, SystemTime};
-use tokio::time::sleep;
 use tokio::sync::Semaphore;
+use tokio::time::sleep;
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;
@@ -498,7 +498,7 @@ async fn probe_for_peers_two(
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
-    semaphore: Arc<Semaphore>
+    semaphore: Arc<Semaphore>,
 ) -> (SocketAddr, ProbeResult) {
     sleep(random_delay).await;
     let _permit = semaphore.acquire_owned().await.unwrap();
@@ -1154,7 +1154,7 @@ async fn hash_probe_and_update(
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
-    semaphore: Arc<Semaphore>
+    semaphore: Arc<Semaphore>,
 ) -> (SocketAddr, ProbeResult) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
@@ -1297,7 +1297,12 @@ async fn slow_walker(
 
         match probe_result.1 {
             ProbeResult::HashResult(new_peer_stat) => {
-                println!("{:?} has new peer stat, which classifies it as a {:?}: {:?}", peer_address, get_classification(&Some(new_peer_stat.clone()), &peer_address, network), new_peer_stat);
+                println!(
+                    "{:?} has new peer stat, which classifies it as a {:?}: {:?}",
+                    peer_address,
+                    get_classification(&Some(new_peer_stat.clone()), &peer_address, network),
+                    new_peer_stat
+                );
                 internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
                 single_node_update(
                     &serving_nodes_shared,
@@ -1365,7 +1370,12 @@ async fn fast_walker(
         let peer_address = probe_result.0;
         match probe_result.1 {
             ProbeResult::HashResult(new_peer_stat) => {
-                println!("{:?} has new peer stat, which classifies it as a {:?}: {:?}", peer_address, get_classification(&Some(new_peer_stat.clone()), &peer_address, network), new_peer_stat);
+                println!(
+                    "{:?} has new peer stat, which classifies it as a {:?}: {:?}",
+                    peer_address,
+                    get_classification(&Some(new_peer_stat.clone()), &peer_address, network),
+                    new_peer_stat
+                );
                 internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
                 single_node_update(
                     &serving_nodes_shared,
@@ -1382,7 +1392,8 @@ async fn fast_walker(
                     internal_peer_tracker[&peer_address].clone(),
                     network,
                     &timeouts,
-                    Duration::from_secs(rng.gen_range(0..smear_cap)), doryphore.clone()
+                    Duration::from_secs(rng.gen_range(0..smear_cap)),
+                    doryphore.clone(),
                 )));
             }
             ProbeResult::PeersResult(new_peers) => {
@@ -1399,7 +1410,8 @@ async fn fast_walker(
                             <Option<PeerStats>>::None,
                             network,
                             &timeouts,
-                            Duration::from_secs(rng.gen_range(0..smear_cap)), doryphore.clone()
+                            Duration::from_secs(rng.gen_range(0..smear_cap)),
+                            doryphore.clone(),
                         )));
                         handles.push(Box::pin(probe_for_peers_two(
                             key.clone(),
