@@ -937,6 +937,7 @@ async fn main() {
                     &mut internal_peer_tracker,
                     network,
                     timeouts,
+                    16,
                 )
                 .await;
                 {
@@ -960,6 +961,7 @@ async fn main() {
                     network,
                     max_inflight_conn.try_into().unwrap(),
                     timeouts,
+                    128
                 )
                 .await;
             }
@@ -1157,6 +1159,7 @@ async fn slow_walker(
     network: Network,
     max_inflight_conn: usize,
     timeouts: Timeouts,
+    smear_cap: u64,
 ) {
     let mut rng = rand::thread_rng();
     let mut batch_queries = Vec::new();
@@ -1167,9 +1170,13 @@ async fn slow_walker(
             peer_stat.clone(),
             network,
             &timeouts,
-            Duration::from_secs(rng.gen_range(0..256))),
+            Duration::from_secs(rng.gen_range(0..smear_cap))),
                 ) as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
-            batch_queries.push(Box::pin(probe_for_peers_two(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..256)))))
+            batch_queries.push(Box::pin(probe_for_peers_two(
+                proband_address.clone(),
+                network,
+                &timeouts,
+                Duration::from_secs(rng.gen_range(0..smear_cap)))))
         } else {
             println!(
                 "NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY",
@@ -1217,6 +1224,7 @@ async fn fast_walker(
     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
     network: Network,
     timeouts: Timeouts,
+    smear_cap: u64,
 ) {
     let mut handles = FuturesUnordered::new();
     let mut rng = rand::thread_rng();
@@ -1226,9 +1234,13 @@ async fn fast_walker(
             peer_stat.clone(),
             network,
             &timeouts,
-            Duration::from_secs(rng.gen_range(0..1))),
+            Duration::from_secs(rng.gen_range(0..smear_cap))),
         ) as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
-        handles.push(Box::pin(probe_for_peers_two(proband_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
+        handles.push(Box::pin(probe_for_peers_two(
+            proband_address.clone(),
+            network,
+            &timeouts,
+            Duration::from_secs(rng.gen_range(0..smear_cap)))));
     }
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
@@ -1247,7 +1259,7 @@ async fn fast_walker(
                     internal_peer_tracker[&peer_address].clone(),
                     network,
                     &timeouts,
-                    Duration::from_secs(rng.gen_range(0..1)),
+                    Duration::from_secs(rng.gen_range(0..smear_cap)),
                 )));
             },
             ProbeResult::PeersResult(new_peers) => {
@@ -1261,9 +1273,13 @@ async fn fast_walker(
                             <Option<PeerStats>>::None,
                             network,
                             &timeouts,
-                            Duration::from_secs(rng.gen_range(0..1)),
+                            Duration::from_secs(rng.gen_range(0..smear_cap)),
                         )));
-                        handles.push(Box::pin(probe_for_peers_two(key.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
+                        handles.push(Box::pin(probe_for_peers_two(
+                            key.clone(),
+                            network,
+                            &timeouts,
+                            Duration::from_secs(rng.gen_range(0..smear_cap)))));
                     }
                 }
             },
@@ -1272,7 +1288,11 @@ async fn fast_walker(
             },
             ProbeResult::MustRetryPeersResult => {
                 println!("Retrying peers probe for {:?}", peer_address);
-                handles.push(Box::pin(probe_for_peers_two(peer_address.clone(), network, &timeouts, Duration::from_secs(rng.gen_range(0..1)))));
+                handles.push(Box::pin(probe_for_peers_two(
+                    peer_address.clone(),
+                    network,
+                    &timeouts,
+                    Duration::from_secs(rng.gen_range(0..smear_cap)))));
             },
         }
 
