@@ -321,7 +321,7 @@ async fn hash_probe_inner(
                     if connection_failure.is::<tower::timeout::error::Elapsed>()
                         || connection_failure.is::<tokio::time::error::Elapsed>()
                     {
-                        println!("Connection with {:?} failed with an Elapsed-type error: {:?}", peer_addr, connection_failure);
+                        println!("zebra-network error: connection with {:?} failed with an Elapsed-type error: {:?}", peer_addr, connection_failure);
                         return BlockProbeResult::TCPFailure;
                     }
 
@@ -330,31 +330,31 @@ async fn hash_probe_inner(
                     {
                         match handshake_error {
                             HandshakeError::UnexpectedMessage(msg)         => {
-                                println!("Zebra-network error: host {:?} violated protocol and gave us an unexpected message: {:?}", peer_addr, msg);
+                                println!("zebra-network error: host {:?} violated protocol and gave us an unexpected message: {:?}", peer_addr, msg);
                                 return BlockProbeResult::ProtocolBad;
                             }
                             HandshakeError::NonceReuse                     => {
-                                println!("Zebra-network error: host {:?} violated protocol and reused a nonce.", peer_addr);
+                                println!("zebra-network error: host {:?} violated protocol and reused a nonce.", peer_addr);
                                 return BlockProbeResult::ProtocolBad;
                             }
                             HandshakeError::ConnectionClosed               => {
-                                println!("Zebra-network error: host {:?} closed connection unexpectedly.", peer_addr);
+                                println!("zebra-network error: host {:?} closed connection unexpectedly.", peer_addr);
                                 return BlockProbeResult::TCPFailure
                             }
                             HandshakeError::Io(inner_io_error)             => {
-                                println!("Zebra-network error: host {:?} caused inner Io error during handshake: {:?}", peer_addr, inner_io_error);
+                                println!("zebra-network error: host {:?} caused inner Io error during handshake: {:?}", peer_addr, inner_io_error);
                                 return BlockProbeResult::ProtocolBad
                             }
                             HandshakeError::Serialization(inner_ser_error) => {
-                                println!("Zebra-network error: host {:?} caused inner Serialization error during handshake: {:?}", peer_addr, inner_ser_error);
+                                println!("zebra-network error: host {:?} caused inner Serialization error during handshake: {:?}", peer_addr, inner_ser_error);
                                 return BlockProbeResult::ProtocolBad
                             }
                             HandshakeError::ObsoleteVersion(ver)           => {
-                                println!("Zebra-network error: host {:?} advertised obsolete version: {:?}", peer_addr, ver);
+                                println!("zebra-network error: host {:?} advertised obsolete version: {:?}", peer_addr, ver);
                                 return BlockProbeResult::ProtocolBad
                             }
                             HandshakeError::Timeout                        => {
-                                println!("Zebra-network error: host {:?} caused timeout during handshake", peer_addr);
+                                println!("zebra-network error: host {:?} caused timeout during handshake", peer_addr);
                                 return BlockProbeResult::TCPFailure
                             }
                         }
