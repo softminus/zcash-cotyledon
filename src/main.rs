@@ -371,14 +371,22 @@ async fn hash_probe_inner(
         Ok(connection_might_have_failed) => {
             match connection_might_have_failed {
                 Err(connection_failure) => {
-                    println!(
-                        "Hash test connection with {:?} failed: {:?}",
-                        peer_addr, classify_zebra_network_errors(&connection_failure)
-                    );
+                    let error_classification = classify_zebra_network_errors(&connection_failure);
 
-                    // need to differentiate between TCP connection failed (regular brokenness, should just be Bad)
-                    // and "tcp connection established, but zebra-network gave us protocol-level errors", which is protocol brokenness -- should be BeyondUseless
-                    BlockProbeResult::TCPFailure // need to differentiate between network brokenness and protocol brokenness; only the latter should provoke a BeyondUseless categorization
+                    match error_classification {
+                        ErrorFlavor::Ephemeral(msg) => {
+                            println!("Hash test connection with {:?} got an ephemeral error: {:?}", peer_addr, msg);
+                            BlockProbeResult::MustRetry
+                        }
+                        ErrorFlavor::Network(msg) => {
+                            println!("Hash test connection with {:?} got an network error: {:?}", peer_addr, msg);
+                            BlockProbeResult::TCPFailure
+                        }
+                        ErrorFlavor::Protocol(msg) => {
+                            println!("Hash test connection with {:?} got an protocol error: {:?}", peer_addr, msg);
+                            BlockProbeResult::ProtocolBad
+                        }
+                    }
                 }
                 Ok(mut good_connection) => {
                     let numeric_version = good_connection.connection_info.remote.version;
