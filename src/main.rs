@@ -929,8 +929,8 @@ async fn main() {
         match mode {
             CrawlingMode::FastAcquisition => {
                 let timeouts = Timeouts {
-                    peers_timeout: Duration::from_secs(32),
-                    hash_timeout: Duration::from_secs(32),
+                    peers_timeout: Duration::from_secs(8),
+                    hash_timeout: Duration::from_secs(8),
                 };
                 fast_walker(
                     &serving_nodes_shared,
