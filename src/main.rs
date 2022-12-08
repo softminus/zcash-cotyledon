@@ -482,25 +482,22 @@ async fn probe_for_peers_two(
         Ok(connection_might_have_failed) => {
             match connection_might_have_failed {
                 Err(connection_failure) => {
-                    println!(
-                        "Connection with {:?} failed: {:?}",
-                        peer_addr, connection_failure
-                    );
-                    if let Some(decanisterized_error) =
-                        connection_failure.downcast_ref::<std::io::Error>()
-                    {
-                        println!(
-                            "IO error detected... decannisterizing: error = {:?}, test={:?}",
-                            decanisterized_error,
-                            decanisterized_error.kind() == std::io::ErrorKind::Uncategorized
-                        );
-                        // Connection with XXX.XXX.XXX.XXX:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
-                        if decanisterized_error.kind() == std::io::ErrorKind::Uncategorized {
-                            // probably an EMFILES / ENFILES
-                            return (peer_addr, ProbeResult::MustRetryPeersResult);
+                    let error_classification = classify_zebra_network_errors(&connection_failure);
+
+                    match error_classification {
+                        ErrorFlavor::Ephemeral(msg) => {
+                            println!("Peer probe connection with {:?} got an ephemeral error: {:?}", peer_addr, msg);
+                            (peer_addr, ProbeResult::MustRetryPeersResult)
+                        }
+                        ErrorFlavor::Network(msg) => {
+                            println!("Peer probe connection with {:?} got an network error: {:?}", peer_addr, msg);
+                            (peer_addr, ProbeResult::PeersFail)
+                        }
+                        ErrorFlavor::Protocol(msg) => {
+                            println!("Peer probe connection with {:?} got an protocol error: {:?}", peer_addr, msg);
+                            (peer_addr, ProbeResult::PeersFail)
                         }
                     }
-                    return (peer_addr, ProbeResult::PeersFail);
                 }
                 Ok(mut good_connection) => {
                     for _attempt in 0..2 {
