@@ -16,7 +16,7 @@ use tower::Service;
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;
 use zebra_network::types::PeerServices;
-use zebra_network::{connect_isolated_tcp_direct, InventoryResponse, Request, Response, Version};
+use zebra_network::{connect_isolated_tcp_direct, InventoryResponse, Request, Response, Version, HandshakeError};
 //use zebra_network::protocol::external::types::Version;
 use rand::Rng;
 use rlimit::{getrlimit, increase_nofile_limit, Resource};
@@ -284,8 +284,8 @@ async fn hash_probe_inner(
     match connection {
         Err(timeout_error) => {
             println!(
-                "Probe connection with {:?} TIMED OUT: {:?}",
-                peer_addr, timeout_error
+                "Hash test connection with {:?} failed due to user-defined timeout of {:?}: {:?}",
+                peer_addr, connection_timeout, timeout_error
             );
             BlockProbeResult::TCPFailure // this counts as network brokenness, should not count as BeyondUseless, just regular Bad
         }
@@ -293,7 +293,7 @@ async fn hash_probe_inner(
             match connection_might_have_failed {
                 Err(connection_failure) => {
                     println!(
-                        "Connection with {:?} failed: {:?}",
+                        "Hash test connection with {:?} failed: {:?}",
                         peer_addr, connection_failure
                     );
                     if let Some(decanisterized_error) =
@@ -317,8 +317,49 @@ async fn hash_probe_inner(
                             std::io::ErrorKind::NetworkUnreachable => {return BlockProbeResult::TCPFailure;}
                             _                                      => {return BlockProbeResult::TCPFailure;}
                         }
-
                     }
+                    if connection_failure.is::<tower::timeout::error::Elapsed>()
+                        || connection_failure.is::<tokio::time::error::Elapsed>()
+                    {
+                        println!("Connection with {:?} failed with an Elapsed-type error: {:?}", peer_addr, connection_failure);
+                        return BlockProbeResult::TCPFailure;
+                    }
+
+                    if let Some(handshake_error) =
+                        connection_failure.downcast_ref::<zebra_network::HandshakeError>()
+                    {
+                        match handshake_error {
+                            HandshakeError::UnexpectedMessage(msg)         => {
+                                println!("Zebra-network error: host {:?} violated protocol and gave us an unexpected message: {:?}", peer_addr, msg);
+                                return BlockProbeResult::ProtocolBad;
+                            }
+                            HandshakeError::NonceReuse                     => {
+                                println!("Zebra-network error: host {:?} violated protocol and reused a nonce.", peer_addr);
+                                return BlockProbeResult::ProtocolBad;
+                            }
+                            HandshakeError::ConnectionClosed               => {
+                                println!("Zebra-network error: host {:?} closed connection unexpectedly.", peer_addr);
+                                return BlockProbeResult::TCPFailure
+                            }
+                            HandshakeError::Io(inner_io_error)             => {
+                                println!("Zebra-network error: host {:?} caused inner Io error during handshake: {:?}", peer_addr, inner_io_error);
+                                return BlockProbeResult::ProtocolBad
+                            }
+                            HandshakeError::Serialization(inner_ser_error) => {
+                                println!("Zebra-network error: host {:?} caused inner Serialization error during handshake: {:?}", peer_addr, inner_ser_error);
+                                return BlockProbeResult::ProtocolBad
+                            }
+                            HandshakeError::ObsoleteVersion(ver)           => {
+                                println!("Zebra-network error: host {:?} advertised obsolete version: {:?}", peer_addr, ver);
+                                return BlockProbeResult::ProtocolBad
+                            }
+                            HandshakeError::Timeout                        => {
+                                println!("Zebra-network error: host {:?} caused timeout during handshake", peer_addr);
+                                return BlockProbeResult::TCPFailure
+                            }
+                        }
+                    }
+
                     // need to differentiate between TCP connection failed (regular brokenness, should just be Bad)
                     // and "tcp connection established, but zebra-network gave us protocol-level errors", which is protocol brokenness -- should be BeyondUseless
                     BlockProbeResult::TCPFailure // need to differentiate between network brokenness and protocol brokenness; only the latter should provoke a BeyondUseless categorization
@@ -347,7 +388,7 @@ async fn hash_probe_inner(
                     match hash_query_response {
                         Err(protocol_error) => {
                             println!("protocol failure after requesting blocks by hash with peer {}: {:?}", peer_addr, protocol_error);
-                            // so far the only errors we've seen here look like one of:
+                            // so far the only errors we've seen here look like one of these, and it's fine to ascribe them to BlockRequestFail and not to ProtocolBad
                             // SharedPeerError(ConnectionClosed)
                             // SharedPeerError(ConnectionReceiveTimeout)
                             // SharedPeerError(NotFoundResponse([Block(block::Hash("")), Block(block::Hash(""))]))
