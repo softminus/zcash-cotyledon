@@ -303,41 +303,20 @@ async fn hash_probe_inner(
                             "IO error detected... decannisterizing: error = {:?}",
                             decanisterized_error);
                         // Connection with XXX.XXX.XXX.XXX:8233 failed: Os { code: 24, kind: Uncategorized, message: "Too many open files" }
-                        if decanisterized_error.kind() == std::io::ErrorKind::Uncategorized {
-                            // probably an EMFILES / ENFILES
-                            return BlockProbeResult::MustRetry;
-                        }
-                        if decanisterized_error.kind() == std::io::ErrorKind::AddrNotAvailable {
-                            // SO_REUSEADDR stuff?
-                            return BlockProbeResult::MustRetry;
-                        }
-                        if decanisterized_error.kind() == std::io::ErrorKind::AddrInUse {
-                            // SO_REUSEADDR stuff?
-                            return BlockProbeResult::MustRetry;
-                        }
-                        if decanisterized_error.kind() == std::io::ErrorKind::ResourceBusy {
-                            // SO_REUSEADDR stuff?
-                            return BlockProbeResult::MustRetry;
-                        }
+                        match decanisterized_error.kind() {
+                            std::io::ErrorKind::Uncategorized      => {return BlockProbeResult::MustRetry;}
+                            std::io::ErrorKind::AddrNotAvailable   => {return BlockProbeResult::MustRetry;}
+                            std::io::ErrorKind::AddrInUse          => {return BlockProbeResult::MustRetry;}
+                            std::io::ErrorKind::ResourceBusy       => {return BlockProbeResult::MustRetry;}
+                            std::io::ErrorKind::NetworkDown        => {return BlockProbeResult::MustRetry;}
+                            std::io::ErrorKind::AlreadyExists      => {return BlockProbeResult::MustRetry;}
 
-                        if decanisterized_error.kind() == std::io::ErrorKind::TimedOut {
-                            // SO_REUSEADDR stuff?
-                            return BlockProbeResult::TCPFailure;
+                            std::io::ErrorKind::TimedOut           => {return BlockProbeResult::TCPFailure;}
+                            std::io::ErrorKind::ConnectionRefused  => {return BlockProbeResult::TCPFailure;}
+                            std::io::ErrorKind::HostUnreachable    => {return BlockProbeResult::TCPFailure;}
+                            std::io::ErrorKind::NetworkUnreachable => {return BlockProbeResult::TCPFailure;}
+                            _                                      => {return BlockProbeResult::TCPFailure;}
                         }
-                        if decanisterized_error.kind() == std::io::ErrorKind::ConnectionRefused {
-                            // SO_REUSEADDR stuff?
-                            return BlockProbeResult::TCPFailure;
-                        }
-                        if decanisterized_error.kind() == std::io::ErrorKind::HostUnreachable {
-                            // SO_REUSEADDR stuff?
-                            return BlockProbeResult::TCPFailure;
-                        }
-                        if decanisterized_error.kind() == std::io::ErrorKind::NetworkUnreachable {
-                            // SO_REUSEADDR stuff?
-                            return BlockProbeResult::TCPFailure;
-                        }
-
-
 
                     }
                     // need to differentiate between TCP connection failed (regular brokenness, should just be Bad)
