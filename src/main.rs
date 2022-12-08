@@ -691,22 +691,29 @@ fn poll_this_time_around(
                 Duration::from_secs(8 * 60 * 60), // 8 hours, it's likely garbage
             )
         }
-        PeerClassification::Bad => {
-            println!("node {:?} is Bad, we try it again in 2 hours", peer_address);
+        PeerClassification::GenericBad => {
+            println!("node {:?} is GenericBad, we try it again in 2 hours", peer_address);
             peer_last_polled_comparison(
                 peer_stats.as_ref().unwrap(),
                 Duration::from_secs(2 * 60 * 60), // 2 hours
+            )
+        }
+        PeerClassification::EventuallyMaybeSynced => {
+            println!("node {:?} is GenericBad, we try it again in 1 hour", peer_address);
+            peer_last_polled_comparison(
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(1 * 60 * 60), // 2 hours
             )
         }
         PeerClassification::MerelySyncedEnough => {
             println!(
                 "node {:?} is MerelySyncedEnough, we try it again in {:?}",
                 peer_address,
-                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap())/2)
+                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap()))
             );
             peer_last_polled_comparison(
                 peer_stats.as_ref().unwrap(),
-                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap())/2)
+                Duration::from_secs(exponential_acquisition_threshold_secs(peer_stats.as_ref().unwrap()))
             )
         }
         PeerClassification::AllGood => {
