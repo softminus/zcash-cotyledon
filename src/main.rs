@@ -965,38 +965,77 @@ async fn hash_probe_and_update(
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let poll_res = hash_probe_inner(proband_address, network, timeouts.hash_timeout).await;
     //println!("result = {:?}", poll_res);
-    new_peer_stats.total_attempts += 1;
     match poll_res {
         BlockProbeResult::MustRetry => {
             println!("Retry the connection!");
             return (proband_address, ProbeResult::MustRetryHashResult);
         }
-        BlockProbeResult::BlockRequestOK(new_peer_data) => {
-            new_peer_stats.total_hash_successes += 1;
+        BlockProbeResult::TCPFailure => {
+            new_peer_stats.total_attempts           += 1;
+            new_peer_stats.tcp_connections_ok       += 0;
+            new_peer_stats.protocol_negotiations_ok += 0;
+            new_peer_stats.valid_block_reply_ok     += 0;
+
+            new_peer_stats.last_polled               = Some(current_poll_time);
+
+            update_ewma_pack(
+                &mut new_peer_stats.ewma_pack,
+                new_peer_stats.last_polled,
+                current_poll_time,
+                false,
+            );
+        }
+        BlockProbeResult::ProtocolBad => {
+            new_peer_stats.total_attempts           += 1;
+            new_peer_stats.tcp_connections_ok       += 1;
+            new_peer_stats.protocol_negotiations_ok += 0;
+            new_peer_stats.valid_block_reply_ok     += 0;
+
+            new_peer_stats.last_polled               = Some(current_poll_time);
+
+            update_ewma_pack(
+                &mut new_peer_stats.ewma_pack,
+                new_peer_stats.last_polled,
+                current_poll_time,
+                false,
+            );
+        }
+        BlockProbeResult::BlockRequestFail(new_peer_data) => {
+
+            new_peer_stats.total_attempts           += 1;
+            new_peer_stats.tcp_connections_ok       += 1;
+            new_peer_stats.protocol_negotiations_ok += 1;
+            new_peer_stats.valid_block_reply_ok     += 0;
+
+            new_peer_stats.last_polled               = Some(current_poll_time);
+            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
+
             new_peer_stats.peer_derived_data = Some(new_peer_data);
-            new_peer_stats.last_success = Some(SystemTime::now());
+
+            update_ewma_pack(
+                &mut new_peer_stats.ewma_pack,
+                new_peer_stats.last_polled,
+                current_poll_time,
+                false,
+            );
+        }
+        BlockProbeResult::BlockRequestOK(new_peer_data) => {
+            new_peer_stats.total_attempts           += 1;
+            new_peer_stats.tcp_connections_ok       += 1;
+            new_peer_stats.protocol_negotiations_ok += 1;
+            new_peer_stats.valid_block_reply_ok     += 1;
+
+            new_peer_stats.last_polled               = Some(current_poll_time);
+            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
+            new_peer_stats.last_block_success        = Some(current_poll_time);
+
+            new_peer_stats.peer_derived_data = Some(new_peer_data);
+
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
                 current_poll_time,
                 true,
-            );
-        }
-        BlockProbeResult::BlockRequestFail(new_peer_data) => {
-            new_peer_stats.peer_derived_data = Some(new_peer_data);
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
-                current_poll_time,
-                false,
-            );
-        }
-        BlockProbeResult::TCPFailure => {
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
-                current_poll_time,
-                false,
             );
         }
     }
