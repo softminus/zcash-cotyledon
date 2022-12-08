@@ -759,7 +759,7 @@ fn get_classification(
         }
 
         // GenericBad test section
-        println!("classifying node {:?} with PeerStats {:?} as GenericBad despite having negotiated wire protocol: {:?}", peer_address, peer_stats, peer_derived_data);
+        println!("WARNING: classifying node {:?} with PeerStats {:?} as GenericBad despite having negotiated wire protocol: {:?}", peer_address, peer_stats, peer_derived_data);
         return PeerClassification::GenericBad;
     } else {
         // never were able to negotiate the wire protocol
@@ -1287,7 +1287,7 @@ async fn slow_walker(
 
         match probe_result.1 {
             ProbeResult::HashResult(new_peer_stat) => {
-                println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
+                println!("{:?} has new peer stat, which classifies it as a {:?}: {:?}", peer_address, get_classification(&Some(new_peer_stat.clone()), &peer_address, network), new_peer_stat);
                 internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
                 single_node_update(
                     &serving_nodes_shared,
@@ -1350,7 +1350,7 @@ async fn fast_walker(
         let peer_address = probe_result.0;
         match probe_result.1 {
             ProbeResult::HashResult(new_peer_stat) => {
-                println!("{:?} has new peer stat: {:?}", peer_address, new_peer_stat);
+                println!("{:?} has new peer stat, which classifies it as a {:?}: {:?}", peer_address, get_classification(&Some(new_peer_stat.clone()), &peer_address, network), new_peer_stat);
                 internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
                 single_node_update(
                     &serving_nodes_shared,
