@@ -26,7 +26,7 @@ use rand::Rng;
 use rlimit::{getrlimit, increase_nofile_limit, Resource};
 use seeder_proto::seeder_server::{Seeder, SeederServer};
 use seeder_proto::{SeedReply, SeedRequest};
-use tokio::net::UdpSocket;
+use tokio::net::{TcpListener, UdpSocket};
 use tokio::time::timeout;
 use tonic::transport::Server;
 use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
@@ -998,11 +998,17 @@ async fn main() {
         serving_network: Network::Mainnet,
     };
     let mut dns_server = trust_dns_server::ServerFuture::new(dns_handler);
-    let dns_socket = "127.0.0.1:5300".to_socket_addrs().unwrap().next().unwrap(); // make me configurable
-    dns_server.register_socket(UdpSocket::bind(dns_socket).await.unwrap());
+
+    // make us configurable
+    dns_server.register_listener(
+        TcpListener::bind("127.0.0.1:5301").await.unwrap(),
+        Duration::from_secs(8),
+    );
+    dns_server.register_socket(UdpSocket::bind("127.0.0.1:5301").await.unwrap());
     tokio::spawn(dns_server.block_until_done());
 
-    let initial_peer_addrs = [ // make me configurable
+    let initial_peer_addrs = [
+        // make me configurable
         "20.47.97.70:8233",
         "51.79.229.21:8233",
         "34.73.242.102:8233",
@@ -1022,7 +1028,7 @@ async fn main() {
             CrawlingMode::FastAcquisition => {
                 let timeouts = Timeouts {
                     peers_timeout: Duration::from_secs(8), // make me configurable
-                    hash_timeout: Duration::from_secs(8), // make me configurable
+                    hash_timeout: Duration::from_secs(8),  // make me configurable
                 };
                 fast_walker(
                     &serving_nodes_shared,
@@ -1037,7 +1043,8 @@ async fn main() {
                     let serving_nodes_testing = serving_nodes_shared.read().unwrap();
                     if serving_nodes_testing.primaries.len()
                         + serving_nodes_testing.alternates.len()
-                        > 3 // make me configurable
+                        > 3
+                    // make me configurable
                     {
                         println!(
                             "SWITCHING TO SLOW WALKER, we are serving a total of {:?} nodes",
