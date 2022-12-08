@@ -235,8 +235,12 @@ static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
 // TCPFailure errors:
 // Os { code: 60, kind: TimedOut, message: "Operation timed out" }
 // Os { code: 61, kind: ConnectionRefused, message: "Connection refused" }
+// Os { code: 65, kind: HostUnreachable, message: "No route to host" }
+// Os { code: 51, kind: NetworkUnreachable, message: "Network is unreachable" }
+
 // Elapsed(())
 // ConnectionClosed
+
 // Serialization(Io(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }))
 
 
@@ -249,8 +253,6 @@ static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
 // ObsoleteVersion(_)
 
 // MustRetry errors:
-// Os { code: 65, kind: HostUnreachable, message: "No route to host" }
-// Os { code: 51, kind: NetworkUnreachable, message: "Network is unreachable" }
 // Os { code: 49, kind: AddrNotAvailable, message: "Can't assign requested address" }
 
 
