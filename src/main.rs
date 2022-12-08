@@ -260,8 +260,21 @@ static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
 
 
 
+#[derive(Debug, Clone)]
+enum ErrorFlavor {
+    Network(String),
+    Ephemeral(String),
+    Protocol(String),
+}
 
 
+fn classify_zebra_network_errors(
+    returned_error:
+    &Box<dyn std::error::Error + std::marker::Send + Sync>
+    ) -> ErrorFlavor
+{
+    return ErrorFlavor::Network("egg".to_string());
+}
 
 async fn hash_probe_inner(
     peer_addr: SocketAddr,
@@ -295,7 +308,7 @@ async fn hash_probe_inner(
                 Err(connection_failure) => {
                     println!(
                         "Hash test connection with {:?} failed: {:?}",
-                        peer_addr, connection_failure
+                        peer_addr, classify_zebra_network_errors(&connection_failure)
                     );
                     if let Some(decanisterized_error) =
                         connection_failure.downcast_ref::<std::io::Error>()
