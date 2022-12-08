@@ -965,7 +965,7 @@ async fn hash_probe_and_update(
     //println!("result = {:?}", poll_res);
     new_peer_stats.total_attempts += 1;
     match poll_res {
-        BlockProbeResult::RetryConnection() => {
+        BlockProbeResult::MustRetry => {
             println!("Retry the connection!");
             return (proband_address, ProbeResult::MustRetryHashResult);
         }
@@ -989,7 +989,7 @@ async fn hash_probe_and_update(
                 false,
             );
         }
-        BlockProbeResult::ConnectionFail() => {
+        BlockProbeResult::TCPFailure => {
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
