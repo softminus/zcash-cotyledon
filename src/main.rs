@@ -557,8 +557,8 @@ fn get_classification(
 
         // MerelySyncedEnough test section
         // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
-        if let Some(last_success) = peer_stats.last_success {
-            if let Ok(duration) = last_success.elapsed() {
+        if let Some(last_block_success) = peer_stats.last_block_success {
+            if let Ok(duration) = last_block_success.elapsed() {
                 if duration <= Duration::from_secs(60 * 60 * 2) {
                     return ancillary_checks_merely_synced(peer_derived_data, peer_address, peer_stats, network);
                 }
