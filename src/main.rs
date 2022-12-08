@@ -15,6 +15,7 @@ use std::time::{Duration, SystemTime};
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;
+use zebra_chain::serialization::SerializationError;
 use zebra_network::types::PeerServices;
 use zebra_network::{connect_isolated_tcp_direct, InventoryResponse, Request, Response, Version, HandshakeError};
 //use zebra_network::protocol::external::types::Version;
@@ -329,6 +330,8 @@ async fn hash_probe_inner(
                         connection_failure.downcast_ref::<zebra_network::HandshakeError>()
                     {
                         match handshake_error {
+                            // absolutely ProtocolBad.
+                            // no way the network could have caused these.
                             HandshakeError::UnexpectedMessage(msg)         => {
                                 println!("zebra-network error: host {:?} violated protocol and gave us an unexpected message: {:?}", peer_addr, msg);
                                 return BlockProbeResult::ProtocolBad;
@@ -337,29 +340,46 @@ async fn hash_probe_inner(
                                 println!("zebra-network error: host {:?} violated protocol and reused a nonce.", peer_addr);
                                 return BlockProbeResult::ProtocolBad;
                             }
+                            HandshakeError::ObsoleteVersion(ver)           => {
+                                println!("zebra-network error: host {:?} advertised obsolete version: {:?}", peer_addr, ver);
+                                return BlockProbeResult::ProtocolBad
+                            }
+
+
+                            // they might be caused by the remote peer software, but we want to avoid
+                            // false-positive BeyondUseless determination, so we are nice and classify these as
+                            // TCPFailures
                             HandshakeError::ConnectionClosed               => {
                                 println!("zebra-network error: host {:?} closed connection unexpectedly.", peer_addr);
                                 return BlockProbeResult::TCPFailure
                             }
                             HandshakeError::Io(inner_io_error)             => {
                                 println!("zebra-network error: host {:?} caused inner Io error during handshake: {:?}", peer_addr, inner_io_error);
-                                return BlockProbeResult::ProtocolBad
-                            }
-                            HandshakeError::Serialization(inner_ser_error) => {
-                                println!("zebra-network error: host {:?} caused inner Serialization error during handshake: {:?}", peer_addr, inner_ser_error);
-                                return BlockProbeResult::ProtocolBad
-                            }
-                            HandshakeError::ObsoleteVersion(ver)           => {
-                                println!("zebra-network error: host {:?} advertised obsolete version: {:?}", peer_addr, ver);
-                                return BlockProbeResult::ProtocolBad
+                                return BlockProbeResult::TCPFailure
                             }
                             HandshakeError::Timeout                        => {
                                 println!("zebra-network error: host {:?} caused timeout during handshake", peer_addr);
                                 return BlockProbeResult::TCPFailure
                             }
+
+                            // this could go both ways -- if it's an Io error, we are nice and classify this as
+                            // a TCPFailure, otherwise, it's a ProtocolBad
+                            HandshakeError::Serialization(inner_ser_error) => {
+                                match inner_ser_error {
+                                    SerializationError::Io(inner_io_error) => {
+                                        println!("zebra-network error: host {:?} caused inner Serialization error with an Io error within during handshake: {:?}", peer_addr, inner_io_error);
+                                        return BlockProbeResult::TCPFailure;
+                                    }
+                                    _ =>
+                                        {
+                                        println!("zebra-network error: host {:?} caused inner Serialization error during handshake: {:?}", peer_addr, inner_ser_error);
+                                        return BlockProbeResult::ProtocolBad;
+                                        }
+                                    }
+                                }
+                            
                         }
                     }
-
                     // need to differentiate between TCP connection failed (regular brokenness, should just be Bad)
                     // and "tcp connection established, but zebra-network gave us protocol-level errors", which is protocol brokenness -- should be BeyondUseless
                     BlockProbeResult::TCPFailure // need to differentiate between network brokenness and protocol brokenness; only the latter should provoke a BeyondUseless categorization
