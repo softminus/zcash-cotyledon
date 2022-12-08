@@ -284,7 +284,7 @@ fn classify_zebra_network_errors(
             std::io::ErrorKind::NetworkDown        => {ErrorFlavor::Ephemeral("NetworkDown Io error".to_string())}
             std::io::ErrorKind::AlreadyExists      => {ErrorFlavor::Ephemeral("AlreadyExists Io error. Consider increasing ephemeral port range, increasing ulimit -n hard limit, or decreasing number of maximum concurrent connections".to_string())}
 
-            _                                      => {ErrorFlavor::Network(io_error.to_string())}
+            _                                      => {ErrorFlavor::Network(format!("IO error: {:?}", io_error))}
         }
     }
     if returned_error.is::<tower::timeout::error::Elapsed>()
@@ -337,7 +337,8 @@ fn classify_zebra_network_errors(
             }
         }
     }
-    panic!("ABORTING! MYSTERY ERROR WE CAN'T HANDLE! {:?}", returned_error);
+    println!("RAN INTO MYSTERY ERROR WE CAN'T CLASSIFY: {:?}", returned_error);
+    ErrorFlavor::Ephemeral(format!("Mysterious error we can't classify: {:?}", returned_error))
 }
 
 async fn hash_probe_inner(
