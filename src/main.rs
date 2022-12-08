@@ -12,6 +12,7 @@ use std::str::FromStr;
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, SystemTime};
 use tokio::time::sleep;
+use tokio::sync::Semaphore;
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;
@@ -497,8 +498,10 @@ async fn probe_for_peers_two(
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
+    semaphore: Arc<Semaphore>
 ) -> (SocketAddr, ProbeResult) {
     sleep(random_delay).await;
+    let _permit = semaphore.acquire_owned().await.unwrap();
     println!(
         "Starting peer probe connection: peer addr is {:?}",
         peer_addr
@@ -1025,6 +1028,7 @@ async fn main() {
                     &serving_nodes_shared,
                     &mut internal_peer_tracker,
                     network,
+                    max_inflight_conn.try_into().unwrap(),
                     timeouts,
                     16,
                 )
@@ -1033,7 +1037,7 @@ async fn main() {
                     let serving_nodes_testing = serving_nodes_shared.read().unwrap();
                     if serving_nodes_testing.primaries.len()
                         + serving_nodes_testing.alternates.len()
-                        > 32
+                        > 3
                     {
                         println!(
                             "SWITCHING TO SLOW WALKER, we are serving a total of {:?} nodes",
@@ -1150,6 +1154,7 @@ async fn hash_probe_and_update(
     network: Network,
     timeouts: &Timeouts,
     random_delay: Duration,
+    semaphore: Arc<Semaphore>
 ) -> (SocketAddr, ProbeResult) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
@@ -1167,8 +1172,10 @@ async fn hash_probe_and_update(
         Some(old_stats) => old_stats.clone(),
     };
     sleep(random_delay).await;
+    let permit = semaphore.acquire_owned().await.unwrap();
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let poll_res = hash_probe_inner(proband_address, network, timeouts.hash_timeout).await;
+    drop(permit);
     //println!("result = {:?}", poll_res);
     match poll_res {
         BlockProbeResult::MustRetry => {
@@ -1257,6 +1264,7 @@ async fn slow_walker(
 ) {
     let mut rng = rand::thread_rng();
     let mut batch_queries = Vec::new();
+    let doryphore = Arc::new(Semaphore::new(max_inflight_conn));
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
         if poll_this_time_around(peer_stat, proband_address, network) {
             batch_queries.push(Box::pin(hash_probe_and_update(
@@ -1265,6 +1273,7 @@ async fn slow_walker(
                 network,
                 &timeouts,
                 Duration::from_secs(rng.gen_range(0..smear_cap)),
+                doryphore.clone(),
             ))
                 as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
             batch_queries.push(Box::pin(probe_for_peers_two(
@@ -1272,6 +1281,7 @@ async fn slow_walker(
                 network,
                 &timeouts,
                 Duration::from_secs(rng.gen_range(0..smear_cap)),
+                doryphore.clone(),
             )))
         } else {
             println!(
@@ -1325,10 +1335,13 @@ async fn fast_walker(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
     network: Network,
+    max_inflight_conn: usize,
     timeouts: Timeouts,
     smear_cap: u64,
 ) {
     let mut handles = FuturesUnordered::new();
+    let doryphore = Arc::new(Semaphore::new(max_inflight_conn));
+
     let mut rng = rand::thread_rng();
     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
         handles.push(Box::pin(hash_probe_and_update(
@@ -1337,6 +1350,7 @@ async fn fast_walker(
             network,
             &timeouts,
             Duration::from_secs(rng.gen_range(0..smear_cap)),
+            doryphore.clone(),
         ))
             as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
         handles.push(Box::pin(probe_for_peers_two(
@@ -1344,6 +1358,7 @@ async fn fast_walker(
             network,
             &timeouts,
             Duration::from_secs(rng.gen_range(0..smear_cap)),
+            doryphore.clone(),
         )));
     }
     while let Some(probe_result) = handles.next().await {
@@ -1367,7 +1382,7 @@ async fn fast_walker(
                     internal_peer_tracker[&peer_address].clone(),
                     network,
                     &timeouts,
-                    Duration::from_secs(rng.gen_range(0..smear_cap)),
+                    Duration::from_secs(rng.gen_range(0..smear_cap)), doryphore.clone()
                 )));
             }
             ProbeResult::PeersResult(new_peers) => {
@@ -1384,13 +1399,14 @@ async fn fast_walker(
                             <Option<PeerStats>>::None,
                             network,
                             &timeouts,
-                            Duration::from_secs(rng.gen_range(0..smear_cap)),
+                            Duration::from_secs(rng.gen_range(0..smear_cap)), doryphore.clone()
                         )));
                         handles.push(Box::pin(probe_for_peers_two(
                             key.clone(),
                             network,
                             &timeouts,
                             Duration::from_secs(rng.gen_range(0..smear_cap)),
+                            doryphore.clone(),
                         )));
                     }
                 }
@@ -1405,6 +1421,7 @@ async fn fast_walker(
                     network,
                     &timeouts,
                     Duration::from_secs(rng.gen_range(0..smear_cap)),
+                    doryphore.clone(),
                 )));
             }
         }
