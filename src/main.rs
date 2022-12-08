@@ -950,11 +950,13 @@ async fn hash_probe_and_update(
     let mut new_peer_stats = match old_stats {
         None => PeerStats {
             total_attempts: 0,
-            protocol_negotiation_failures: 0,
-            total_hash_successes: 0,
+            tcp_connections_ok: 0,
+            protocol_negotiations_ok: 0,
+            valid_block_reply_ok: 0,
             ewma_pack: EWMAPack::default(),
             last_polled: None,
-            last_success: None,
+            last_protocol_negotiation: None,
+            last_block_success: None,
             peer_derived_data: None,
         },
         Some(old_stats) => old_stats.clone(),
