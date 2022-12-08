@@ -1,5 +1,6 @@
 #![feature(ip)]
 #![feature(io_error_uncategorized)]
+#![feature(io_error_more)]
 #![feature(once_cell)]
 use futures_util::stream::FuturesUnordered;
 use futures_util::StreamExt;
@@ -306,6 +307,38 @@ async fn hash_probe_inner(
                             // probably an EMFILES / ENFILES
                             return BlockProbeResult::MustRetry;
                         }
+                        if decanisterized_error.kind() == std::io::ErrorKind::AddrNotAvailable {
+                            // SO_REUSEADDR stuff?
+                            return BlockProbeResult::MustRetry;
+                        }
+                        if decanisterized_error.kind() == std::io::ErrorKind::AddrInUse {
+                            // SO_REUSEADDR stuff?
+                            return BlockProbeResult::MustRetry;
+                        }
+                        if decanisterized_error.kind() == std::io::ErrorKind::ResourceBusy {
+                            // SO_REUSEADDR stuff?
+                            return BlockProbeResult::MustRetry;
+                        }
+
+                        if decanisterized_error.kind() == std::io::ErrorKind::TimedOut {
+                            // SO_REUSEADDR stuff?
+                            return BlockProbeResult::TCPFailure;
+                        }
+                        if decanisterized_error.kind() == std::io::ErrorKind::ConnectionRefused {
+                            // SO_REUSEADDR stuff?
+                            return BlockProbeResult::TCPFailure;
+                        }
+                        if decanisterized_error.kind() == std::io::ErrorKind::HostUnreachable {
+                            // SO_REUSEADDR stuff?
+                            return BlockProbeResult::TCPFailure;
+                        }
+                        if decanisterized_error.kind() == std::io::ErrorKind::NetworkUnreachable {
+                            // SO_REUSEADDR stuff?
+                            return BlockProbeResult::TCPFailure;
+                        }
+
+
+
                     }
                     // need to differentiate between TCP connection failed (regular brokenness, should just be Bad)
                     // and "tcp connection established, but zebra-network gave us protocol-level errors", which is protocol brokenness -- should be BeyondUseless
