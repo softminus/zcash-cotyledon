@@ -843,6 +843,7 @@ fn update_ewma_pack(
             sample_age = duration
         }
     }
+    assert!(!sample_age.is_zero());
     update_ewma(&mut prev.stat_2_hours, sample_age, sample);
     update_ewma(&mut prev.stat_8_hours, sample_age, sample);
     update_ewma(&mut prev.stat_1day, sample_age, sample);
@@ -1212,14 +1213,13 @@ async fn hash_probe_and_update(
             new_peer_stats.protocol_negotiations_ok += 0;
             new_peer_stats.valid_block_reply_ok += 0;
 
-            new_peer_stats.last_polled = Some(current_poll_time);
-
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
                 current_poll_time,
                 false,
             );
+            new_peer_stats.last_polled = Some(current_poll_time);
         }
         BlockProbeResult::ProtocolBad => {
             new_peer_stats.total_attempts += 1;
@@ -1227,14 +1227,14 @@ async fn hash_probe_and_update(
             new_peer_stats.protocol_negotiations_ok += 0;
             new_peer_stats.valid_block_reply_ok += 0;
 
-            new_peer_stats.last_polled = Some(current_poll_time);
-
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
                 current_poll_time,
                 false,
             );
+            new_peer_stats.last_polled = Some(current_poll_time);
+
         }
         BlockProbeResult::BlockRequestFail(new_peer_data) => {
             new_peer_stats.total_attempts += 1;
@@ -1242,8 +1242,6 @@ async fn hash_probe_and_update(
             new_peer_stats.protocol_negotiations_ok += 1;
             new_peer_stats.valid_block_reply_ok += 0;
 
-            new_peer_stats.last_polled = Some(current_poll_time);
-            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
 
@@ -1253,6 +1251,9 @@ async fn hash_probe_and_update(
                 current_poll_time,
                 false,
             );
+            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
+            new_peer_stats.last_polled = Some(current_poll_time);
+
         }
         BlockProbeResult::BlockRequestOK(new_peer_data) => {
             new_peer_stats.total_attempts += 1;
@@ -1260,18 +1261,18 @@ async fn hash_probe_and_update(
             new_peer_stats.protocol_negotiations_ok += 1;
             new_peer_stats.valid_block_reply_ok += 1;
 
-            new_peer_stats.last_polled = Some(current_poll_time);
-            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
-            new_peer_stats.last_block_success = Some(current_poll_time);
-
             new_peer_stats.peer_derived_data = Some(new_peer_data);
-
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
                 current_poll_time,
                 true,
             );
+            new_peer_stats.last_polled = Some(current_poll_time);
+            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
+            new_peer_stats.last_block_success = Some(current_poll_time);
+
+            println!("new ewma pack is {:?}",new_peer_stats.ewma_pack)
         }
     }
     new_peer_stats.last_polled = Some(current_poll_time);
