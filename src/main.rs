@@ -851,15 +851,6 @@ fn update_ewma_pack(
     update_ewma(&mut prev.stat_1month, sample_age, sample);
 }
 
-// all of these need exponential ramp-up, not just the favorable ones.
-// if we don't do this, then a network blip during the Fast Walker traverse
-// will consign otherwise good nodes into GenericBad, which means they won't get sampled again
-// for a long time
-
-
-// yeah, this means we will send more queries to the truly garbage nodes, but they'll quickly get into BeyondUseless
-// after 10 (TCP connection worked + protocol negotiation failed) queries, and we can be pretty harsh with the polling rate
-// for BeyondUseless anyway, since it takes effort to get to BeyondUseless
 // (a single successful protocol negotiation -- ever -- gets you out of BeyondUseless:
 // this in itself should be a bit less lenient, probably make it fade after one week or something)
 
@@ -883,64 +874,64 @@ fn poll_this_time_around(
             true // never tried a connection, so let's give it a try
         }
         PeerClassification::BeyondUseless => {
+            let threshold = exponential_acquisition_threshold_secs(
+                    peer_stats.as_ref().unwrap(),
+                    Duration::from_secs(60*8),    // base duration: 8 minutes
+                    16,                           // number of attempts in exponential warmup
+                    Duration::from_secs(60*60*16) // final duration: 16 hours
+                );
             println!(
-                "node {:?} is BeyondUseless, we try it again in 8 hours",
-                peer_address
-            );
-            peer_last_polled_comparison(
-                peer_stats.as_ref().unwrap(),
-                Duration::from_secs(8 * 60 * 60), // 8 hours, it's likely garbage
-            )
+                "node {:?} is BeyondUseless, we try it again in {:?}",
+                peer_address, threshold);
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
         }
         PeerClassification::GenericBad => {
+            let threshold = exponential_acquisition_threshold_secs(
+                    peer_stats.as_ref().unwrap(),
+                    Duration::from_secs(60*4),   // base duration: 4 minutes
+                    16,                          // number of attempts in exponential warmup
+                    Duration::from_secs(60*60*4) // final duration: 4 hours
+                );
             println!(
-                "node {:?} is GenericBad, we try it again in 2 hours",
-                peer_address
-            );
-            peer_last_polled_comparison(
-                peer_stats.as_ref().unwrap(),
-                Duration::from_secs(2 * 60 * 60), // 2 hours
-            )
+                "node {:?} is GenericBad, we try it again in {:?}",
+                peer_address, threshold);
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
         }
         PeerClassification::EventuallyMaybeSynced => {
+            let threshold = exponential_acquisition_threshold_secs(
+                    peer_stats.as_ref().unwrap(),
+                    Duration::from_secs(60*2), // base duration: 2 minutes
+                    16,                        // number of attempts in exponential warmup
+                    Duration::from_secs(60*30) // final duration: 30 minutes
+                );
             println!(
-                "node {:?} is GenericBad, we try it again in 1 hour",
-                peer_address
-            );
-            peer_last_polled_comparison(
-                peer_stats.as_ref().unwrap(),
-                Duration::from_secs(1 * 60 * 60), // 2 hours
-            )
+                "node {:?} is EventuallyMaybeSynced, we try it again in {:?}",
+                peer_address, threshold);
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
         }
         PeerClassification::MerelySyncedEnough => {
+            let threshold = exponential_acquisition_threshold_secs(
+                    peer_stats.as_ref().unwrap(),
+                    Duration::from_secs(60*2), // base duration: 2 minutes
+                    16,                        // number of attempts in exponential warmup
+                    Duration::from_secs(60*30) // final duration: 30 minutes
+                );
             println!(
                 "node {:?} is MerelySyncedEnough, we try it again in {:?}",
-                peer_address,
-                Duration::from_secs(exponential_acquisition_threshold_secs(
-                    peer_stats.as_ref().unwrap()
-                ))
-            );
-            peer_last_polled_comparison(
-                peer_stats.as_ref().unwrap(),
-                Duration::from_secs(exponential_acquisition_threshold_secs(
-                    peer_stats.as_ref().unwrap(),
-                )),
-            )
+                peer_address, threshold);
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)        
         }
         PeerClassification::AllGood => {
+            let threshold = exponential_acquisition_threshold_secs(
+                    peer_stats.as_ref().unwrap(),
+                    Duration::from_secs(60*2), // base duration: 2 minutes
+                    16,                        // number of attempts in exponential warmup
+                    Duration::from_secs(60*30) // final duration: 30 minutes
+                );
             println!(
                 "node {:?} is AllGood, we try it again in {:?}",
-                peer_address,
-                Duration::from_secs(exponential_acquisition_threshold_secs(
-                    peer_stats.as_ref().unwrap()
-                ))
-            );
-            peer_last_polled_comparison(
-                peer_stats.as_ref().unwrap(),
-                Duration::from_secs(exponential_acquisition_threshold_secs(
-                    peer_stats.as_ref().unwrap(),
-                )),
-            )
+                peer_address, threshold);
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
         }
     }
 }
@@ -957,11 +948,11 @@ fn peer_last_polled_comparison(peer_stats: &PeerStats, duration_threshold: Durat
     }
 }
 
-fn exponential_acquisition_threshold_secs(peer_stats: &PeerStats) -> u64 {
-    if peer_stats.total_attempts < 32 {
-        peer_stats.total_attempts * 2 * (60 as u64)
+fn exponential_acquisition_threshold_secs(peer_stats: &PeerStats, base_duration: Duration, attempts_cap: u64, final_duration: Duration) -> Duration {
+    if peer_stats.total_attempts < attempts_cap {
+        Duration::from_secs(peer_stats.total_attempts * base_duration.as_secs())
     } else {
-        32 * 60
+        final_duration
     }
 }
 
