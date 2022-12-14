@@ -985,7 +985,7 @@ async fn main() {
         _ = increase_nofile_limit(hardlimit);
     }
     let max_inflight_conn = match getrlimit(Resource::NOFILE) {
-        Ok((softlimit, _hardlimit)) => softlimit.min(4096), // limit it to avoid hurting NAT middleboxes
+        Ok((softlimit, _hardlimit)) => softlimit.min(1024), // limit it to avoid hurting NAT middleboxes
         _ => 128, // if we can't figure it out, play it really safe
     };
 
