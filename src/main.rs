@@ -956,7 +956,7 @@ fn update_ewma_pack(
     current_polling_time: SystemTime,
     sample: bool,
 ) {
-    let mut sample_age = Duration::from_secs(60 * 60 * 2); // default weighting, in case we haven't polled it yet
+    let mut sample_age = Duration::from_secs(1); // default weighting, in case we haven't polled it yet
 
     if let Some(previous_polling_time) = previous_polling_time {
         if let Ok(duration) = current_polling_time.duration_since(previous_polling_time) {
