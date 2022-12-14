@@ -850,6 +850,23 @@ fn update_ewma_pack(
     update_ewma(&mut prev.stat_1month, sample_age, sample);
 }
 
+// all of these need exponential ramp-up, not just the favorable ones.
+// if we don't do this, then a network blip during the Fast Walker traverse
+// will consign otherwise good nodes into GenericBad, which means they won't get sampled again
+// for a long time
+
+
+// yeah, this means we will send more queries to the truly garbage nodes, but they'll quickly get into BeyondUseless
+// after 10 (TCP connection worked + protocol negotiation failed) queries, and we can be pretty harsh with the polling rate
+// for BeyondUseless anyway, since it takes effort to get to BeyondUseless
+// (a single successful protocol negotiation -- ever -- gets you out of BeyondUseless:
+// this in itself should be a bit less lenient, probably make it fade after one week or something)
+
+
+// also we should have a way to detect how long it's been since a peer has been reported by a node,
+// if it goes over a big threshold (like a month), stop tracking it altogether and remove it from the tracker
+
+
 fn poll_this_time_around(
     peer_stats: &Option<PeerStats>,
     peer_address: &SocketAddr,
