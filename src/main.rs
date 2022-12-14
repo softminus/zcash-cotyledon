@@ -700,7 +700,6 @@ async fn probe_for_peers_two(
     }
 }
 
-//Connection with 74.208.91.217:8233 failed: Serialization(Parse("getblocks version did not match negotiation"))
 
 #[derive(Debug, Clone, Copy, Default)]
 struct EWMAState {
@@ -807,11 +806,6 @@ fn ancillary_checks_eventually_maybe_synced(
         return PeerClassification::EventuallyMaybeSynced;
     }
 }
-
-// long term goal: add config options that look like:
-// all_good_tests = numeric_version | peer_height
-// merely_synced_enough_tests = numeric_version | peer_height
-// to allow operator to customize tests should they become tetchy (also if we want to be extra we could disable the hash test to revert the seeder to the legacy behavior)
 
 fn get_classification(
     peer_stats: &Option<PeerStats>,
@@ -980,13 +974,6 @@ fn update_ewma_pack(
     update_ewma(&mut prev.stat_1week, sample_age, sample);
     update_ewma(&mut prev.stat_1month, sample_age, sample);
 }
-
-// (a single successful protocol negotiation -- ever -- gets you out of BeyondUseless:
-// this in itself should be a bit less lenient, probably make it fade after one week or something)
-
-
-// also we should have a way to detect how long it's been since a peer has been reported by a node,
-// if it goes over a big threshold (like a month), stop tracking it altogether and remove it from the tracker
 
 
 fn poll_this_time_around(
