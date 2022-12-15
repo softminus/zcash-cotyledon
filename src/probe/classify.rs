@@ -1,4 +1,35 @@
+use crate::probe::PeerClassification;
+use futures::Future;
+use futures_util::stream::FuturesUnordered;
+use futures_util::StreamExt;
+use rand::Rng;
+use rlimit::{getrlimit, increase_nofile_limit, Resource};
+use crate::serving::grpc::grpc_protocol::seeder_server::{Seeder, SeederServer};
+use std::collections::{HashMap, HashSet};
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::pin::Pin;
+use std::str::FromStr;
+use std::sync::{Arc, LazyLock, RwLock};
+use std::time::{Duration, SystemTime};
+use tokio::net::{TcpListener, UdpSocket};
+use tokio::sync::Semaphore;
+use tokio::time::{sleep, timeout};
+use tonic::transport::Server;
+use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
+use tower::Service;
+use zebra_chain::block::{Hash, Height};
+use zebra_chain::parameters::Network;
+use zebra_chain::serialization::SerializationError;
+use zebra_consensus::CheckpointList;
+use zebra_network::types::{MetaAddr, PeerServices};
+use zebra_network::{
+    connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
+};
 
+use crate::probe::internal::PeerDerivedData;
+
+use crate::probe::internal::REQUIRED_MAINNET_HEIGHT;
+use crate::probe::internal::REQUIRED_TESTNET_HEIGHT;
 
 #[derive(Debug, Clone, Copy, Default)]
 struct EWMAState {
@@ -27,15 +58,6 @@ struct PeerStats {
     peer_derived_data: Option<PeerDerivedData>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum PeerClassification {
-    Unknown,               // We got told about this node but haven't yet queried it
-    BeyondUseless, // We established a TCP connection, but protocol negotation has never worked. This probably isn't a Zcash or Zebra node.
-    GenericBad, // We were able to establish a TCP connection, and the host is bad for a reason that doesn't make it BeyondUseless
-    EventuallyMaybeSynced, // This looks like it could be a good node once it's synced enough, so poll it more often so it graduates earlier
-    MerelySyncedEnough, // In the past 2 hours, this node served us a recent-enough block (synced-enough to the zcash chain) but doesn't meet uptime criteria
-    AllGood, // Node meets all the legacy criteria (including uptime), can serve a recent-enough block
-}
 
 
 fn ancillary_checks_all_good(

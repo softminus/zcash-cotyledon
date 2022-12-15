@@ -2,13 +2,14 @@
 #![feature(io_error_uncategorized)]
 #![feature(io_error_more)]
 #![feature(once_cell)]
+mod serving;
+mod probe;
 use futures::Future;
 use futures_util::stream::FuturesUnordered;
 use futures_util::StreamExt;
 use rand::Rng;
 use rlimit::{getrlimit, increase_nofile_limit, Resource};
-use seeder_proto::seeder_server::{Seeder, SeederServer};
-use seeder_proto::{SeedReply, SeedRequest};
+use crate::serving::grpc::grpc_protocol::seeder_server::{Seeder, SeederServer};
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::pin::Pin;
@@ -21,10 +22,6 @@ use tokio::time::{sleep, timeout};
 use tonic::transport::Server;
 use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
 use tower::Service;
-use trust_dns_server::authority::MessageResponseBuilder;
-use trust_dns_server::client::rr as dnsrr;
-use trust_dns_server::proto::op as dnsop;
-use trust_dns_server::server as dns;
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;
 use zebra_chain::serialization::SerializationError;
@@ -34,15 +31,25 @@ use zebra_network::{
     connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
 };
 
+use crate::probe::classify::PeerClassification;
+use crate::probe::ProbeResult;
+use crate::serving::ServingNodes;
+use crate::serving::grpc::SeedContext;
+use crate::serving::dns::DnsContext;
+use crate::probe::classify::PeerStats;
+use crate::probe::Timeouts;
+use crate::serving::update_serving_nodes;
+use crate::probe::classify::PeerStats;
+use crate::probe::classify::get_classification;
+use crate::probe::hash_probe_and_update;
+use crate::probe::internal::probe_for_peers_two;
+use crate::serving::single_node_update;
+
 enum CrawlingMode {
     FastAcquisition,
     LongTermUpdates,
 }
 
-struct Timeouts {
-    hash_timeout: Duration,
-    peers_timeout: Duration,
-}
 
 #[tokio::main]
 async fn main() {

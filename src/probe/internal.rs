@@ -1,3 +1,86 @@
+use crate::probe::ProbeResult;
+use futures::Future;
+use futures_util::stream::FuturesUnordered;
+use futures_util::StreamExt;
+use rand::Rng;
+use rlimit::{getrlimit, increase_nofile_limit, Resource};
+use crate::serving::grpc::grpc_protocol::seeder_server::{Seeder, SeederServer};
+use std::collections::{HashMap, HashSet};
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::pin::Pin;
+use std::str::FromStr;
+use std::sync::{Arc, LazyLock, RwLock};
+use std::time::{Duration, SystemTime};
+use tokio::net::{TcpListener, UdpSocket};
+use tokio::sync::Semaphore;
+use tokio::time::{sleep, timeout};
+use tonic::transport::Server;
+use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
+use tower::Service;
+use zebra_chain::block::{Hash, Height};
+use zebra_chain::parameters::Network;
+use zebra_chain::serialization::SerializationError;
+use zebra_consensus::CheckpointList;
+use zebra_network::types::{MetaAddr, PeerServices};
+use zebra_network::{
+    connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
+};
+
+use crate::probe::Timeouts;
+
+#[derive(Debug, Clone)]
+enum BlockProbeResult {
+    // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
+    MustRetry, // increment nothing
+
+    // Error establishing the TCP connection. Counts as a normal failure against the node
+    TCPFailure, // increment total_attempts
+
+    // Protocol negotiation failure. We were able to establish a TCP connection, but they said something zebra-network didn't like
+    ProtocolBad, // increment total_attempts and tcp_connections_ok
+
+    // Abnormal reply to the block request. We negotiated the protocol OK, but their reply to the block requests wasn't perfect
+    BlockRequestFail(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok
+
+    // Nominal reply to the block request
+    BlockRequestOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok and valid_block_reply_ok
+}
+
+#[derive(Debug, Clone)]
+enum HeadersProbeResult {
+    // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
+    MustRetry, // increment nothing
+
+    // Error establishing the TCP connection. Counts as a normal failure against the node
+    TCPFailure, // increment total_attempts
+
+    // Protocol negotiation failure. We were able to establish a TCP connection, but they said something zebra-network didn't like
+    ProtocolBad, // increment total_attempts and tcp_connections_ok
+
+    // Abnormal reply to the headers request. We negotiated the protocol OK, but their reply to the block requests wasn't perfect
+    HeadersFail(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok
+
+    // Nominal reply to the headers request
+    HeadersOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok and valid_headers_reply_ok
+}
+
+
+#[derive(Debug, Clone)]
+enum NegotiationProbeResult {
+    // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
+    MustRetry, // increment nothing
+
+    // Error establishing the TCP connection. Counts as a normal failure against the node
+    TCPFailure, // increment total_attempts
+
+    // Protocol negotiation failure. We were able to establish a TCP connection, but they said something zebra-network didn't like
+    ProtocolBad, // increment total_attempts and tcp_connections_ok
+
+    // Protocol negotiation went OK
+    ProtocolOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok
+}
+
+
 #[derive(Debug, Clone)]
 struct PeerDerivedData {
     numeric_version: Version,
@@ -308,7 +391,7 @@ async fn headers_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
     connection_timeout: Duration,
-) -> LightweightProbeResult {
+) -> HeadersProbeResult {
     println!(
         "Starting new headers probe connection: peer addr is {:?}",
         peer_addr
@@ -334,7 +417,7 @@ async fn headers_probe_inner(
                 "Headers test connection with {:?} failed due to user-defined timeout of {:?}: {:?}",
                 peer_addr, connection_timeout, timeout_error
             );
-            LightweightProbeResult::TCPFailure // this counts as network brokenness, should not count as BeyondUseless, just regular Bad
+            HeadersProbeResult::TCPFailure // this counts as network brokenness, should not count as BeyondUseless, just regular Bad
         }
         Ok(connection_might_have_failed) => {
             match connection_might_have_failed {
@@ -347,21 +430,21 @@ async fn headers_probe_inner(
                                 "Headers test connection with {:?} got an ephemeral error: {:?}",
                                 peer_addr, msg
                             );
-                            LightweightProbeResult::MustRetry
+                            HeadersProbeResult::MustRetry
                         }
                         ErrorFlavor::Network(msg) => {
                             println!(
                                 "Headers test connection with {:?} got an network error: {:?}",
                                 peer_addr, msg
                             );
-                            LightweightProbeResult::TCPFailure
+                            HeadersProbeResult::TCPFailure
                         }
                         ErrorFlavor::Protocol(msg) => {
                             println!(
                                 "Headers test connection with {:?} got an protocol error: {:?}",
                                 peer_addr, msg
                             );
-                            LightweightProbeResult::ProtocolBad
+                            HeadersProbeResult::ProtocolBad
                         }
                     }
                 }
@@ -393,11 +476,11 @@ async fn headers_probe_inner(
                             // SharedPeerError(ConnectionClosed)
                             // SharedPeerError(ConnectionReceiveTimeout)
                             // SharedPeerError(NotFoundResponse([Block(block::Hash("")), Block(block::Hash(""))]))
-                            return LightweightProbeResult::LightweightFail(peer_derived_data);
+                            return HeadersProbeResult::LightweightFail(peer_derived_data);
                         }
                         Ok(headers_query_protocol_response) => {
                             println!("Headers request gave us {:?}", headers_query_protocol_response);
-                            return LightweightProbeResult::LightweightOK(peer_derived_data);
+                            return HeadersProbeResult::LightweightOK(peer_derived_data);
                         }
                     }
                 }
@@ -487,55 +570,3 @@ async fn probe_for_peers_two(
 
 
 
-
-#[derive(Debug, Clone)]
-enum BlockProbeResult {
-    // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
-    MustRetry, // increment nothing
-
-    // Error establishing the TCP connection. Counts as a normal failure against the node
-    TCPFailure, // increment total_attempts
-
-    // Protocol negotiation failure. We were able to establish a TCP connection, but they said something zebra-network didn't like
-    ProtocolBad, // increment total_attempts and tcp_connections_ok
-
-    // Abnormal reply to the block request. We negotiated the protocol OK, but their reply to the block requests wasn't perfect
-    BlockRequestFail(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok
-
-    // Nominal reply to the block request
-    BlockRequestOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok and valid_block_reply_ok
-}
-
-#[derive(Debug, Clone)]
-enum HeadersProbeResult {
-    // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
-    MustRetry, // increment nothing
-
-    // Error establishing the TCP connection. Counts as a normal failure against the node
-    TCPFailure, // increment total_attempts
-
-    // Protocol negotiation failure. We were able to establish a TCP connection, but they said something zebra-network didn't like
-    ProtocolBad, // increment total_attempts and tcp_connections_ok
-
-    // Abnormal reply to the headers request. We negotiated the protocol OK, but their reply to the block requests wasn't perfect
-    HeadersFail(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok
-
-    // Nominal reply to the headers request
-    HeadersOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok and valid_headers_reply_ok
-}
-
-
-#[derive(Debug, Clone)]
-enum NegotiationProbeResult {
-    // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
-    MustRetry, // increment nothing
-
-    // Error establishing the TCP connection. Counts as a normal failure against the node
-    TCPFailure, // increment total_attempts
-
-    // Protocol negotiation failure. We were able to establish a TCP connection, but they said something zebra-network didn't like
-    ProtocolBad, // increment total_attempts and tcp_connections_ok
-
-    // Protocol negotiation went OK
-    ProtocolOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok
-}
