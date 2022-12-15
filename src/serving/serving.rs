@@ -1,0 +1,71 @@
+#[derive(Debug, Clone, Default)]
+struct ServingNodes {
+    primaries: HashSet<SocketAddr>,
+    alternates: HashSet<SocketAddr>,
+}
+
+
+fn update_serving_nodes(
+    serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+    internal_peer_tracker: &HashMap<SocketAddr, Option<PeerStats>>,
+) {
+    let mut primary_nodes = HashSet::new();
+    let mut alternate_nodes = HashSet::new();
+
+    for (key, value) in internal_peer_tracker {
+        if key.ip().is_global() {
+            let classification = get_classification(&value, &key, Network::Mainnet);
+            if classification == PeerClassification::AllGood {
+                primary_nodes.insert(key.clone());
+            }
+            if classification == PeerClassification::MerelySyncedEnough {
+                alternate_nodes.insert(key.clone());
+            }
+        }
+    }
+    println!("primary nodes: {:?}", primary_nodes);
+    println!("alternate nodes: {:?}", alternate_nodes);
+    let new_nodes = ServingNodes {
+        primaries: primary_nodes,
+        alternates: alternate_nodes,
+    };
+
+    let mut unlocked = serving_nodes_shared.write().unwrap();
+    *unlocked = new_nodes.clone();
+}
+
+fn single_node_update(
+    serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+    new_peer_address: &SocketAddr,
+    new_peer_stat: &Option<PeerStats>,
+) {
+    if new_peer_address.ip().is_global() {
+        let old_nodes = serving_nodes_shared.read().unwrap();
+        let mut primary_nodes = old_nodes.primaries.clone();
+        let mut alternate_nodes = old_nodes.alternates.clone();
+        drop(old_nodes);
+
+        match get_classification(new_peer_stat, new_peer_address, Network::Mainnet) {
+            PeerClassification::AllGood => {
+                primary_nodes.insert(new_peer_address.clone());
+                alternate_nodes.remove(new_peer_address);
+            }
+            PeerClassification::MerelySyncedEnough => {
+                primary_nodes.remove(new_peer_address);
+                alternate_nodes.insert(new_peer_address.clone());
+            }
+            _ => {
+                primary_nodes.remove(new_peer_address);
+                alternate_nodes.remove(new_peer_address);
+            }
+        }
+
+        let new_nodes = ServingNodes {
+            primaries: primary_nodes,
+            alternates: alternate_nodes,
+        };
+
+        let mut unlocked = serving_nodes_shared.write().unwrap();
+        *unlocked = new_nodes.clone();
+    }
+}
