@@ -29,7 +29,7 @@ use zebra_network::{
 use crate::probe::Timeouts;
 
 #[derive(Debug, Clone)]
-enum BlockProbeResult {
+pub enum BlockProbeResult {
     // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
     MustRetry, // increment nothing
 
@@ -47,7 +47,7 @@ enum BlockProbeResult {
 }
 
 #[derive(Debug, Clone)]
-enum HeadersProbeResult {
+pub enum HeadersProbeResult {
     // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
     MustRetry, // increment nothing
 
@@ -66,7 +66,7 @@ enum HeadersProbeResult {
 
 
 #[derive(Debug, Clone)]
-enum NegotiationProbeResult {
+pub enum NegotiationProbeResult {
     // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
     MustRetry, // increment nothing
 
@@ -82,15 +82,15 @@ enum NegotiationProbeResult {
 
 
 #[derive(Debug, Clone)]
-struct PeerDerivedData {
-    numeric_version: Version,
-    peer_services: PeerServices,
-    peer_height: Height,
-    _user_agent: String,
-    _relay: bool,
+pub struct PeerDerivedData {
+    pub numeric_version: Version,
+    pub peer_services: PeerServices,
+    pub peer_height: Height,
+    pub _user_agent: String,
+    pub _relay: bool,
 }
 
-static HASH_CHECKPOINTS_MAINNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
+pub static HASH_CHECKPOINTS_MAINNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     let checkpoint = CheckpointList::new(Network::Mainnet);
     let mut proband_heights = HashSet::new();
     let mut proband_hashes = HashSet::new();
@@ -115,17 +115,17 @@ static HASH_CHECKPOINTS_MAINNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     proband_hashes
 });
 
-static REQUIRED_MAINNET_HEIGHT: LazyLock<Height> = LazyLock::new(|| {
+pub static REQUIRED_MAINNET_HEIGHT: LazyLock<Height> = LazyLock::new(|| {
     let checkpoint = CheckpointList::new(Network::Mainnet);
     checkpoint.max_height()
 });
 
-static REQUIRED_TESTNET_HEIGHT: LazyLock<Height> = LazyLock::new(|| {
+pub static REQUIRED_TESTNET_HEIGHT: LazyLock<Height> = LazyLock::new(|| {
     let checkpoint = CheckpointList::new(Network::Testnet);
     checkpoint.max_height()
 });
 
-static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
+pub static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {
     let checkpoint = CheckpointList::new(Network::Testnet);
     let mut proband_heights = HashSet::new();
     let mut proband_hashes = HashSet::new();
@@ -259,7 +259,7 @@ fn classify_zebra_network_errors(
 
 
 
-async fn hash_probe_inner(
+pub async fn hash_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
     connection_timeout: Duration,
@@ -476,11 +476,11 @@ async fn headers_probe_inner(
                             // SharedPeerError(ConnectionClosed)
                             // SharedPeerError(ConnectionReceiveTimeout)
                             // SharedPeerError(NotFoundResponse([Block(block::Hash("")), Block(block::Hash(""))]))
-                            return HeadersProbeResult::LightweightFail(peer_derived_data);
+                            return HeadersProbeResult::HeadersFail(peer_derived_data);
                         }
                         Ok(headers_query_protocol_response) => {
                             println!("Headers request gave us {:?}", headers_query_protocol_response);
-                            return HeadersProbeResult::LightweightOK(peer_derived_data);
+                            return HeadersProbeResult::HeadersOK(peer_derived_data);
                         }
                     }
                 }
@@ -491,7 +491,7 @@ async fn headers_probe_inner(
 
 
 
-async fn probe_for_peers_two(
+pub async fn probe_for_peers_two(
     peer_addr: SocketAddr,
     network: Network,
     timeouts: &Timeouts,
@@ -530,7 +530,7 @@ async fn probe_for_peers_two(
                             "Peer probe connection with {:?} got an ephemeral error: {:?}",
                             peer_addr, msg
                         );
-                        (peer_addr, ProbeResult::MustRetryPeersResult)
+                        (peer_addr, ProbeResult::MustRetryPeers)
                     }
                     ErrorFlavor::Network(msg) => {
                         println!(

@@ -30,16 +30,16 @@ use zebra_network::{
 };
 use crate::probe::classify::PeerStats;
 
-struct Timeouts {
-    hash_timeout: Duration,
-    peers_timeout: Duration,
+pub struct Timeouts {
+    pub hash_timeout: Duration,
+    pub peers_timeout: Duration,
 }
 
 use crate::probe::classify::EWMAPack;
 use crate::probe::internal::hash_probe_inner;
 use crate::probe::classify::update_ewma_pack;
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum PeerClassification {
+pub enum PeerClassification {
     Unknown,               // We got told about this node but haven't yet queried it
     BeyondUseless, // We established a TCP connection, but protocol negotation has never worked. This probably isn't a Zcash or Zebra node.
     GenericBad, // We were able to establish a TCP connection, and the host is bad for a reason that doesn't make it BeyondUseless
@@ -49,7 +49,7 @@ enum PeerClassification {
 }
 
 #[derive(Debug, Clone)]
-enum ProbeResult {
+pub enum ProbeResult {
     Result(PeerStats),
     MustRetryProbe,
     PeersResult(Vec<MetaAddr>),
@@ -57,7 +57,7 @@ enum ProbeResult {
     MustRetryPeers,
 }
 
-enum ProbeType {
+pub enum ProbeType {
     Block,
     Headers,
     Negotation
@@ -96,7 +96,7 @@ async fn ewma_probe_and_update(
     match poll_res {
         BlockProbeResult::MustRetry => {
             println!("Retry the connection!");
-            return (proband_address, ProbeResult::MustRetryHashResult);
+            return (proband_address, ProbeResult::MustRetryProbe);
         }
         BlockProbeResult::TCPFailure => {
             new_peer_stats.total_attempts += 1;
@@ -167,13 +167,13 @@ async fn ewma_probe_and_update(
         }
     }
     new_peer_stats.last_polled = Some(current_poll_time);
-    return (proband_address, ProbeResult::HashResult(new_peer_stats));
+    return (proband_address, ProbeResult::Result(new_peer_stats));
 }
 
 
 
 
-async fn hash_probe_and_update(
+pub async fn hash_probe_and_update(
     proband_address: SocketAddr,
     old_stats: Option<PeerStats>,
     network: Network,
@@ -205,7 +205,7 @@ async fn hash_probe_and_update(
     match poll_res {
         BlockProbeResult::MustRetry => {
             println!("Retry the connection!");
-            return (proband_address, ProbeResult::MustRetryHashResult);
+            return (proband_address, ProbeResult::MustRetryProbe);
         }
         BlockProbeResult::TCPFailure => {
             new_peer_stats.total_attempts += 1;
@@ -276,5 +276,5 @@ async fn hash_probe_and_update(
         }
     }
     new_peer_stats.last_polled = Some(current_poll_time);
-    return (proband_address, ProbeResult::HashResult(new_peer_stats));
+    return (proband_address, ProbeResult::Result(new_peer_stats));
 }

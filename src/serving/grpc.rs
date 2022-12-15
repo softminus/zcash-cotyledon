@@ -35,7 +35,7 @@ pub mod grpc_protocol {
 
 #[derive(Debug)]
 pub struct SeedContext {
-    serving_nodes_shared: Arc<RwLock<ServingNodes>>,
+    pub serving_nodes_shared: Arc<RwLock<ServingNodes>>,
 }
 
 #[tonic::async_trait]

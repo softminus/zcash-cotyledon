@@ -34,8 +34,8 @@ use zebra_network::{
 
 #[derive(Clone, Debug)]
 pub struct DnsContext {
-    serving_nodes_shared: Arc<RwLock<ServingNodes>>,
-    serving_network: Network,
+    pub serving_nodes_shared: Arc<RwLock<ServingNodes>>,
+    pub serving_network: Network,
 }
 
 #[async_trait::async_trait]

@@ -31,13 +31,13 @@ use crate::probe::classify::PeerStats;
 use crate::probe::classify::get_classification;
 
 #[derive(Debug, Clone, Default)]
-struct ServingNodes {
-    primaries: HashSet<SocketAddr>,
-    alternates: HashSet<SocketAddr>,
+pub struct ServingNodes {
+    pub primaries: HashSet<SocketAddr>,
+    pub alternates: HashSet<SocketAddr>,
 }
 
 
-fn update_serving_nodes(
+pub fn update_serving_nodes(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     internal_peer_tracker: &HashMap<SocketAddr, Option<PeerStats>>,
 ) {
@@ -66,7 +66,7 @@ fn update_serving_nodes(
     *unlocked = new_nodes.clone();
 }
 
-fn single_node_update(
+pub fn single_node_update(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
     new_peer_address: &SocketAddr,
     new_peer_stat: &Option<PeerStats>,

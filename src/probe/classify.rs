@@ -31,6 +31,31 @@ use crate::probe::internal::PeerDerivedData;
 use crate::probe::internal::REQUIRED_MAINNET_HEIGHT;
 use crate::probe::internal::REQUIRED_TESTNET_HEIGHT;
 
+
+
+#[derive(Debug, Clone)]
+pub struct PeerStats {
+    pub total_attempts: u64,
+    pub tcp_connections_ok: u64,
+    pub protocol_negotiations_ok: u64,
+    pub valid_block_reply_ok: u64,
+    pub ewma_pack: EWMAPack,
+    pub last_polled: Option<SystemTime>,
+    pub last_protocol_negotiation: Option<SystemTime>,
+    pub last_block_success: Option<SystemTime>,
+
+    pub peer_derived_data: Option<PeerDerivedData>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct EWMAPack {
+    stat_2_hours: EWMAState,
+    stat_8_hours: EWMAState,
+    stat_1day: EWMAState,
+    stat_1week: EWMAState,
+    stat_1month: EWMAState,
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 struct EWMAState {
     scale: Duration,
@@ -38,26 +63,6 @@ struct EWMAState {
     count: f64,
     reliability: f64,
 }
-
-
-
-
-
-
-#[derive(Debug, Clone)]
-struct PeerStats {
-    total_attempts: u64,
-    tcp_connections_ok: u64,
-    protocol_negotiations_ok: u64,
-    valid_block_reply_ok: u64,
-    ewma_pack: EWMAPack,
-    last_polled: Option<SystemTime>,
-    last_protocol_negotiation: Option<SystemTime>,
-    last_block_success: Option<SystemTime>,
-
-    peer_derived_data: Option<PeerDerivedData>,
-}
-
 
 
 fn ancillary_checks_all_good(
@@ -116,7 +121,7 @@ fn ancillary_checks_eventually_maybe_synced(
     }
 }
 
-fn get_classification(
+pub fn get_classification(
     peer_stats: &Option<PeerStats>,
     peer_address: &SocketAddr,
     network: Network,
@@ -212,14 +217,6 @@ fn get_classification(
 
 
 
-#[derive(Debug, Clone, Copy)]
-struct EWMAPack {
-    stat_2_hours: EWMAState,
-    stat_8_hours: EWMAState,
-    stat_1day: EWMAState,
-    stat_1week: EWMAState,
-    stat_1month: EWMAState,
-}
 
 impl Default for EWMAPack {
     fn default() -> Self {
@@ -259,7 +256,7 @@ fn update_ewma(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     prev.reliability = prev.reliability * weight_factor + sample_value * (1.0 - weight_factor);
 }
 
-fn update_ewma_pack(
+pub fn update_ewma_pack(
     prev: &mut EWMAPack,
     previous_polling_time: Option<SystemTime>,
     current_polling_time: SystemTime,
@@ -295,6 +292,6 @@ fn required_serving_version(network: Network) -> Version {
     }
 }
 
-fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
+pub fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
     return peer_address.port() == network.default_port();
 }

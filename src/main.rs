@@ -31,12 +31,11 @@ use zebra_network::{
     connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
 };
 
-use crate::probe::classify::PeerClassification;
+use crate::probe::PeerClassification;
 use crate::probe::ProbeResult;
 use crate::serving::ServingNodes;
 use crate::serving::grpc::SeedContext;
 use crate::serving::dns::DnsContext;
-use crate::probe::classify::PeerStats;
 use crate::probe::Timeouts;
 use crate::serving::update_serving_nodes;
 use crate::probe::classify::PeerStats;
@@ -447,7 +446,7 @@ async fn slow_walker(
         let peer_address = probe_result.0;
 
         match probe_result.1 {
-            ProbeResult::HashResult(new_peer_stat) => {
+            ProbeResult::Result(new_peer_stat) => {
                 println!(
                     "{:?} has new peer stat, which classifies it as a {:?}: {:?}",
                     peer_address,
@@ -462,7 +461,7 @@ async fn slow_walker(
                 );
                 println!("HashMap len: {:?}", internal_peer_tracker.len());
             }
-            ProbeResult::MustRetryHashResult => {
+            ProbeResult::MustRetryProbe => {
                 println!("Slow Walker probing {:?} for hashes failed due to too many open sockets, this should NOT HAPPEN", peer_address);
             }
             ProbeResult::PeersResult(new_peers) => {
@@ -480,7 +479,7 @@ async fn slow_walker(
                     peer_address
                 );
             }
-            ProbeResult::MustRetryPeersResult => {
+            ProbeResult::MustRetryPeers => {
                 println!("Slow Walker probing {:?} for peers failed due to too many open sockets, this should NOT HAPPEN", peer_address);
             }
         }
@@ -520,7 +519,7 @@ async fn fast_walker(
     while let Some(probe_result) = handles.next().await {
         let peer_address = probe_result.0;
         match probe_result.1 {
-            ProbeResult::HashResult(new_peer_stat) => {
+            ProbeResult::Result(new_peer_stat) => {
                 println!(
                     "{:?} has new peer stat, which classifies it as a {:?}: {:?}",
                     peer_address,
@@ -535,7 +534,7 @@ async fn fast_walker(
                 );
                 println!("HashMap len: {:?}", internal_peer_tracker.len());
             }
-            ProbeResult::MustRetryHashResult => {
+            ProbeResult::MustRetryProbe => {
                 // we gotta retry
                 println!("Retrying hash probe for {:?}", peer_address);
                 handles.push(Box::pin(hash_probe_and_update(
@@ -577,7 +576,7 @@ async fn fast_walker(
             ProbeResult::PeersFail => {
                 println!("probing {:?} for peers failed, not retrying", peer_address);
             }
-            ProbeResult::MustRetryPeersResult => {
+            ProbeResult::MustRetryPeers => {
                 println!("Retrying peers probe for {:?}", peer_address);
                 handles.push(Box::pin(probe_for_peers_two(
                     peer_address.clone(),
