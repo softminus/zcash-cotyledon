@@ -20,8 +20,7 @@ use zebra_network::{
     connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
 };
 
-use crate::probe::ProbeResult;
-use crate::probe::Timeouts;
+use crate::probe::{ProbeResult, Timeouts};
 
 #[derive(Debug, Clone)]
 pub enum BlockProbeResult {

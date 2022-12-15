@@ -13,7 +13,6 @@ use zebra_chain::parameters::Network;
 use crate::probe::classify::dns_servable;
 use crate::serving::ServingNodes;
 
-
 #[derive(Clone, Debug)]
 pub struct DnsContext {
     pub serving_nodes_shared: Arc<RwLock<ServingNodes>>,

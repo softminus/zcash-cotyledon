@@ -11,10 +11,9 @@ use tokio::time::sleep;
 use zebra_chain::parameters::Network;
 use zebra_network::types::MetaAddr;
 
-use internal::BlockProbeResult;
-use crate::probe::classify::PeerStats;
-use crate::probe::classify::{update_ewma_pack, EWMAPack};
+use crate::probe::classify::{update_ewma_pack, EWMAPack, PeerStats};
 use crate::probe::internal::hash_probe_inner;
+use internal::BlockProbeResult;
 
 pub struct Timeouts {
     pub hash_timeout: Duration,
