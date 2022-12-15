@@ -5,38 +5,34 @@
 use futures::Future;
 use futures_util::stream::FuturesUnordered;
 use futures_util::StreamExt;
+use rand::Rng;
+use rlimit::{getrlimit, increase_nofile_limit, Resource};
+use seeder_proto::seeder_server::{Seeder, SeederServer};
+use seeder_proto::{SeedReply, SeedRequest};
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, SystemTime};
-use tokio::sync::Semaphore;
-use tokio::time::sleep;
-use tower::Service;
-use zebra_chain::block::{Hash, Height};
-use zebra_chain::parameters::Network;
-use zebra_chain::serialization::SerializationError;
-use zebra_network::types::PeerServices;
-use zebra_network::{
-    connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
-};
-//use zebra_network::protocol::external::types::Version;
-use rand::Rng;
-use rlimit::{getrlimit, increase_nofile_limit, Resource};
-use seeder_proto::seeder_server::{Seeder, SeederServer};
-use seeder_proto::{SeedReply, SeedRequest};
 use tokio::net::{TcpListener, UdpSocket};
-use tokio::time::timeout;
+use tokio::sync::Semaphore;
+use tokio::time::{sleep, timeout};
 use tonic::transport::Server;
 use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
+use tower::Service;
 use trust_dns_server::authority::MessageResponseBuilder;
 use trust_dns_server::client::rr as dnsrr;
 use trust_dns_server::proto::op as dnsop;
 use trust_dns_server::server as dns;
+use zebra_chain::block::{Hash, Height};
+use zebra_chain::parameters::Network;
+use zebra_chain::serialization::SerializationError;
 use zebra_consensus::CheckpointList;
-use zebra_network::types::MetaAddr;
-
+use zebra_network::types::{MetaAddr, PeerServices};
+use zebra_network::{
+    connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
+};
 
 enum CrawlingMode {
     FastAcquisition,
@@ -90,7 +86,145 @@ async fn main() {
         "20.47.97.70:8233",
         "51.79.229.21:8233",
         "34.73.242.102:8233",
-        "162.19.139.183:8235", "51.210.208.202:8836", "221.223.25.99:2331", "85.15.179.171:8233", "195.201.111.115:8233", "94.156.174.100:8233", "8.209.65.101:8233", "23.88.71.118:8233", "51.77.64.51:8233", "8.210.14.154:8233", "124.126.140.196:2331", "47.242.8.170:8233", "8.214.158.97:8233", "85.214.219.243:8233", "54.238.23.140:8233", "51.81.184.90:30834", "116.202.53.174:8533", "88.80.148.28:8233", "203.96.179.202:8233", "84.75.28.247:8233", "39.97.172.77:8233", "51.79.57.29:8233", "51.77.64.59:8233", "178.128.101.61:8233", "51.77.64.61:8233", "194.135.81.61:8233", "46.4.50.226:8233", "54.145.30.137:8233", "64.201.122.142:54324", "34.202.104.227:30570", "39.97.233.19:8233", "142.132.212.130:8836", "104.233.147.162:8233", "51.81.154.19:30834", "51.178.76.73:8836", "144.217.11.155:8233", "13.231.190.41:8233", "18.235.47.206:8233", "51.222.254.36:8233", "65.108.41.222:20005", "54.84.155.205:8233", "46.249.236.211:8233", "162.19.139.183:8233", "173.212.197.63:8233", "176.34.40.41:8233", "5.196.80.197:8233", "91.206.16.214:8233", "79.43.86.64:8233", "157.90.88.178:9058", "50.7.29.20:8233", "23.129.64.30:8233", "162.55.103.190:8233", "47.254.69.198:8233", "116.62.229.19:8233", "51.210.220.135:8836", "51.81.184.89:30834", "51.79.229.21:8233", "104.207.139.34:8233", "37.59.32.10:8233", "47.90.209.31:8233", "51.210.216.77:8836", "3.252.40.246:5001", "18.217.102.40:8233", "15.235.85.30:8233", "139.99.123.157:8233", "159.89.26.105:8233", "65.108.41.222:21005", "51.195.62.151:8233", "51.79.230.103:8233", "8.210.73.119:8233", "157.245.172.190:8233", "3.72.134.66:8233", "51.210.208.201:8836", "162.19.139.181:8233", "141.95.45.187:30834", "161.97.155.203:8233", "35.91.16.78:8233", "51.178.76.85:8836", "73.172.228.152:8233", "142.132.202.124:8836", "52.28.203.21:8233", "120.24.79.67:8233", "20.47.97.70:8233", "65.108.220.35:8233", "47.89.158.145:8233", "47.75.194.174:8233", "18.189.228.115:8233", "116.203.188.195:8233", "157.90.89.105:9058", "116.202.170.226:8233", "8.218.11.43:8233", "51.210.216.76:8836", "51.195.234.88:2838", "178.234.34.18:8233", "165.232.125.107:8233", "136.243.145.143:8233", "135.181.18.180:8233", "95.217.78.170:8233", "88.198.48.91:8233", "97.119.97.142:8233", "39.97.242.143:8233", "123.114.100.178:2331", "8.219.76.216:8233", "5.2.75.10:8233", "91.199.137.99:8233", "5.9.74.158:8233", "35.233.224.178:8233", "78.46.46.252:8233", "34.255.6.39:5001", "162.19.139.182:8233", "3.16.30.39:8233", "47.242.184.215:8233", "51.210.114.183:8836", "47.252.44.174:8233", "35.230.70.77:8233", "135.181.79.230:8233", "65.21.137.242:8233", "47.254.176.240:8233", "37.187.88.208:8233", "168.119.147.118:8233", "47.243.196.68:8233", "162.19.136.65:30834", "34.196.173.50:8233", "8.218.10.114:8233", "62.210.69.194:8233", "209.141.47.197:8233", "44.197.66.202:8233", "35.72.109.227:8233", "44.200.177.58:8233", "51.222.245.186:8233", "111.90.145.162:8233", "135.148.55.16:8233", "51.195.63.10:30834", "65.21.40.28:8233", "46.4.192.189:8233", "78.189.206.225:8233", "8.209.80.185:8233", "147.135.11.134:8233"];
+        "162.19.139.183:8235",
+        "51.210.208.202:8836",
+        "221.223.25.99:2331",
+        "85.15.179.171:8233",
+        "195.201.111.115:8233",
+        "94.156.174.100:8233",
+        "8.209.65.101:8233",
+        "23.88.71.118:8233",
+        "51.77.64.51:8233",
+        "8.210.14.154:8233",
+        "124.126.140.196:2331",
+        "47.242.8.170:8233",
+        "8.214.158.97:8233",
+        "85.214.219.243:8233",
+        "54.238.23.140:8233",
+        "51.81.184.90:30834",
+        "116.202.53.174:8533",
+        "88.80.148.28:8233",
+        "203.96.179.202:8233",
+        "84.75.28.247:8233",
+        "39.97.172.77:8233",
+        "51.79.57.29:8233",
+        "51.77.64.59:8233",
+        "178.128.101.61:8233",
+        "51.77.64.61:8233",
+        "194.135.81.61:8233",
+        "46.4.50.226:8233",
+        "54.145.30.137:8233",
+        "64.201.122.142:54324",
+        "34.202.104.227:30570",
+        "39.97.233.19:8233",
+        "142.132.212.130:8836",
+        "104.233.147.162:8233",
+        "51.81.154.19:30834",
+        "51.178.76.73:8836",
+        "144.217.11.155:8233",
+        "13.231.190.41:8233",
+        "18.235.47.206:8233",
+        "51.222.254.36:8233",
+        "65.108.41.222:20005",
+        "54.84.155.205:8233",
+        "46.249.236.211:8233",
+        "162.19.139.183:8233",
+        "173.212.197.63:8233",
+        "176.34.40.41:8233",
+        "5.196.80.197:8233",
+        "91.206.16.214:8233",
+        "79.43.86.64:8233",
+        "157.90.88.178:9058",
+        "50.7.29.20:8233",
+        "23.129.64.30:8233",
+        "162.55.103.190:8233",
+        "47.254.69.198:8233",
+        "116.62.229.19:8233",
+        "51.210.220.135:8836",
+        "51.81.184.89:30834",
+        "51.79.229.21:8233",
+        "104.207.139.34:8233",
+        "37.59.32.10:8233",
+        "47.90.209.31:8233",
+        "51.210.216.77:8836",
+        "3.252.40.246:5001",
+        "18.217.102.40:8233",
+        "15.235.85.30:8233",
+        "139.99.123.157:8233",
+        "159.89.26.105:8233",
+        "65.108.41.222:21005",
+        "51.195.62.151:8233",
+        "51.79.230.103:8233",
+        "8.210.73.119:8233",
+        "157.245.172.190:8233",
+        "3.72.134.66:8233",
+        "51.210.208.201:8836",
+        "162.19.139.181:8233",
+        "141.95.45.187:30834",
+        "161.97.155.203:8233",
+        "35.91.16.78:8233",
+        "51.178.76.85:8836",
+        "73.172.228.152:8233",
+        "142.132.202.124:8836",
+        "52.28.203.21:8233",
+        "120.24.79.67:8233",
+        "20.47.97.70:8233",
+        "65.108.220.35:8233",
+        "47.89.158.145:8233",
+        "47.75.194.174:8233",
+        "18.189.228.115:8233",
+        "116.203.188.195:8233",
+        "157.90.89.105:9058",
+        "116.202.170.226:8233",
+        "8.218.11.43:8233",
+        "51.210.216.76:8836",
+        "51.195.234.88:2838",
+        "178.234.34.18:8233",
+        "165.232.125.107:8233",
+        "136.243.145.143:8233",
+        "135.181.18.180:8233",
+        "95.217.78.170:8233",
+        "88.198.48.91:8233",
+        "97.119.97.142:8233",
+        "39.97.242.143:8233",
+        "123.114.100.178:2331",
+        "8.219.76.216:8233",
+        "5.2.75.10:8233",
+        "91.199.137.99:8233",
+        "5.9.74.158:8233",
+        "35.233.224.178:8233",
+        "78.46.46.252:8233",
+        "34.255.6.39:5001",
+        "162.19.139.182:8233",
+        "3.16.30.39:8233",
+        "47.242.184.215:8233",
+        "51.210.114.183:8836",
+        "47.252.44.174:8233",
+        "35.230.70.77:8233",
+        "135.181.79.230:8233",
+        "65.21.137.242:8233",
+        "47.254.176.240:8233",
+        "37.187.88.208:8233",
+        "168.119.147.118:8233",
+        "47.243.196.68:8233",
+        "162.19.136.65:30834",
+        "34.196.173.50:8233",
+        "8.218.10.114:8233",
+        "62.210.69.194:8233",
+        "209.141.47.197:8233",
+        "44.197.66.202:8233",
+        "35.72.109.227:8233",
+        "44.200.177.58:8233",
+        "51.222.245.186:8233",
+        "111.90.145.162:8233",
+        "135.148.55.16:8233",
+        "51.195.63.10:30834",
+        "65.21.40.28:8233",
+        "46.4.192.189:8233",
+        "78.189.206.225:8233",
+        "8.209.80.185:8233",
+        "147.135.11.134:8233",
+    ];
 
     let mut internal_peer_tracker: HashMap<SocketAddr, Option<PeerStats>> = HashMap::new();
 
@@ -157,7 +291,6 @@ async fn main() {
     }
 }
 
-
 fn poll_this_time_around(
     peer_stats: &Option<PeerStats>,
     peer_address: &SocketAddr,
@@ -174,62 +307,67 @@ fn poll_this_time_around(
         }
         PeerClassification::BeyondUseless => {
             let threshold = exponential_acquisition_threshold_secs(
-                    peer_stats.as_ref().unwrap(),
-                    Duration::from_secs(60*8),    // base duration: 8 minutes
-                    16,                           // number of attempts in exponential warmup
-                    Duration::from_secs(60*60*16) // final duration: 16 hours
-                );
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(60 * 8), // base duration: 8 minutes
+                16,                          // number of attempts in exponential warmup
+                Duration::from_secs(60 * 60 * 16), // final duration: 16 hours
+            );
             println!(
                 "node {:?} is BeyondUseless, we try it again in {:?}",
-                peer_address, threshold);
+                peer_address, threshold
+            );
             peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
         }
         PeerClassification::GenericBad => {
             let threshold = exponential_acquisition_threshold_secs(
-                    peer_stats.as_ref().unwrap(),
-                    Duration::from_secs(60*4),   // base duration: 4 minutes
-                    16,                          // number of attempts in exponential warmup
-                    Duration::from_secs(60*60*4) // final duration: 4 hours
-                );
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(60 * 4), // base duration: 4 minutes
+                16,                          // number of attempts in exponential warmup
+                Duration::from_secs(60 * 60 * 4), // final duration: 4 hours
+            );
             println!(
                 "node {:?} is GenericBad, we try it again in {:?}",
-                peer_address, threshold);
+                peer_address, threshold
+            );
             peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
         }
         PeerClassification::EventuallyMaybeSynced => {
             let threshold = exponential_acquisition_threshold_secs(
-                    peer_stats.as_ref().unwrap(),
-                    Duration::from_secs(60*2), // base duration: 2 minutes
-                    16,                        // number of attempts in exponential warmup
-                    Duration::from_secs(60*30) // final duration: 30 minutes
-                );
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(60 * 2),  // base duration: 2 minutes
+                16,                           // number of attempts in exponential warmup
+                Duration::from_secs(60 * 30), // final duration: 30 minutes
+            );
             println!(
                 "node {:?} is EventuallyMaybeSynced, we try it again in {:?}",
-                peer_address, threshold);
+                peer_address, threshold
+            );
             peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
         }
         PeerClassification::MerelySyncedEnough => {
             let threshold = exponential_acquisition_threshold_secs(
-                    peer_stats.as_ref().unwrap(),
-                    Duration::from_secs(60*2), // base duration: 2 minutes
-                    16,                        // number of attempts in exponential warmup
-                    Duration::from_secs(60*30) // final duration: 30 minutes
-                );
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(60 * 2),  // base duration: 2 minutes
+                16,                           // number of attempts in exponential warmup
+                Duration::from_secs(60 * 30), // final duration: 30 minutes
+            );
             println!(
                 "node {:?} is MerelySyncedEnough, we try it again in {:?}",
-                peer_address, threshold);
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)        
+                peer_address, threshold
+            );
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
         }
         PeerClassification::AllGood => {
             let threshold = exponential_acquisition_threshold_secs(
-                    peer_stats.as_ref().unwrap(),
-                    Duration::from_secs(60*2), // base duration: 2 minutes
-                    16,                        // number of attempts in exponential warmup
-                    Duration::from_secs(60*30) // final duration: 30 minutes
-                );
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(60 * 2),  // base duration: 2 minutes
+                16,                           // number of attempts in exponential warmup
+                Duration::from_secs(60 * 30), // final duration: 30 minutes
+            );
             println!(
                 "node {:?} is AllGood, we try it again in {:?}",
-                peer_address, threshold);
+                peer_address, threshold
+            );
             peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
         }
     }
@@ -247,14 +385,18 @@ fn peer_last_polled_comparison(peer_stats: &PeerStats, duration_threshold: Durat
     }
 }
 
-fn exponential_acquisition_threshold_secs(peer_stats: &PeerStats, base_duration: Duration, attempts_cap: u64, final_duration: Duration) -> Duration {
+fn exponential_acquisition_threshold_secs(
+    peer_stats: &PeerStats,
+    base_duration: Duration,
+    attempts_cap: u64,
+    final_duration: Duration,
+) -> Duration {
     if peer_stats.total_attempts < attempts_cap {
         Duration::from_secs(peer_stats.total_attempts * base_duration.as_secs())
     } else {
         final_duration
     }
 }
-
 
 async fn slow_walker(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
