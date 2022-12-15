@@ -4,7 +4,6 @@
 #![feature(once_cell)]
 mod probe;
 mod serving;
-use crate::serving::grpc::grpc_protocol::seeder_server::SeederServer;
 use futures::Future;
 use futures_util::stream::FuturesUnordered;
 use futures_util::StreamExt;
@@ -26,6 +25,8 @@ use zebra_chain::parameters::Network;
 use crate::probe::classify::{get_classification, PeerStats};
 use crate::probe::internal::probe_for_peers_two;
 use crate::probe::{hash_probe_and_update, PeerClassification, ProbeResult, Timeouts};
+
+use crate::serving::grpc::grpc_protocol::seeder_server::SeederServer;
 use crate::serving::dns::DnsContext;
 use crate::serving::grpc::SeedContext;
 use crate::serving::{single_node_update, update_serving_nodes, ServingNodes};

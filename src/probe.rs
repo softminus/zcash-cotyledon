@@ -1,10 +1,7 @@
 pub mod classify;
 pub mod internal;
 
-use internal::BlockProbeResult;
-
 use std::net::SocketAddr;
-
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -12,18 +9,18 @@ use tokio::sync::Semaphore;
 use tokio::time::sleep;
 
 use zebra_chain::parameters::Network;
-
 use zebra_network::types::MetaAddr;
 
+use internal::BlockProbeResult;
 use crate::probe::classify::PeerStats;
+use crate::probe::classify::{update_ewma_pack, EWMAPack};
+use crate::probe::internal::hash_probe_inner;
 
 pub struct Timeouts {
     pub hash_timeout: Duration,
     pub peers_timeout: Duration,
 }
 
-use crate::probe::classify::{update_ewma_pack, EWMAPack};
-use crate::probe::internal::hash_probe_inner;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PeerClassification {
     Unknown,               // We got told about this node but haven't yet queried it

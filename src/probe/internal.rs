@@ -1,5 +1,3 @@
-use crate::probe::ProbeResult;
-
 use futures_util::StreamExt;
 
 use std::collections::HashSet;
@@ -12,6 +10,7 @@ use tokio::sync::Semaphore;
 use tokio::time::{sleep, timeout};
 
 use tower::Service;
+
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;
 use zebra_chain::serialization::SerializationError;
@@ -21,6 +20,7 @@ use zebra_network::{
     connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
 };
 
+use crate::probe::ProbeResult;
 use crate::probe::Timeouts;
 
 #[derive(Debug, Clone)]
