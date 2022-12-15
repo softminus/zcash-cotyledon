@@ -2,32 +2,30 @@ pub mod classify;
 pub mod internal;
 
 use internal::BlockProbeResult;
-use futures::Future;
-use futures_util::stream::FuturesUnordered;
-use futures_util::StreamExt;
-use rand::Rng;
-use rlimit::{getrlimit, increase_nofile_limit, Resource};
-use crate::serving::grpc::grpc_protocol::seeder_server::{Seeder, SeederServer};
-use std::collections::{HashMap, HashSet};
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
-use std::pin::Pin;
-use std::str::FromStr;
-use std::sync::{Arc, LazyLock, RwLock};
+
+
+
+
+
+
+
+use std::net::{SocketAddr};
+
+
+use std::sync::{Arc};
 use std::time::{Duration, SystemTime};
-use tokio::net::{TcpListener, UdpSocket};
+
 use tokio::sync::Semaphore;
-use tokio::time::{sleep, timeout};
-use tonic::transport::Server;
-use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
-use tower::Service;
-use zebra_chain::block::{Hash, Height};
+use tokio::time::{sleep};
+
+
+
+
 use zebra_chain::parameters::Network;
-use zebra_chain::serialization::SerializationError;
-use zebra_consensus::CheckpointList;
-use zebra_network::types::{MetaAddr, PeerServices};
-use zebra_network::{
-    connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
-};
+
+
+use zebra_network::types::{MetaAddr};
+
 use crate::probe::classify::PeerStats;
 
 pub struct Timeouts {
@@ -70,7 +68,7 @@ async fn ewma_probe_and_update(
     timeouts: &Timeouts,
     random_delay: Duration,
     semaphore: Arc<Semaphore>,
-    probe_type: ProbeType
+    _probe_type: ProbeType
 ) -> (SocketAddr, ProbeResult) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
