@@ -1,6 +1,7 @@
-use futures_util::StreamExt;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
+
+use futures_util::StreamExt;
 
 use zebra_chain::block::Height;
 use zebra_chain::parameters::Network;

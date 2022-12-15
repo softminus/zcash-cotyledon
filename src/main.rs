@@ -4,17 +4,21 @@
 #![feature(once_cell)]
 mod probe;
 mod serving;
-use futures::Future;
-use futures_util::stream::FuturesUnordered;
-use futures_util::StreamExt;
-use rand::Rng;
-use rlimit::{getrlimit, increase_nofile_limit, Resource};
+
 use std::collections::HashMap;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::pin::Pin;
-
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime};
+
+use rand::Rng;
+
+use futures::Future;
+use futures_util::stream::FuturesUnordered;
+use futures_util::StreamExt;
+
+use rlimit::{getrlimit, increase_nofile_limit, Resource};
+
 use tokio::net::{TcpListener, UdpSocket};
 use tokio::sync::Semaphore;
 use tokio::time::sleep;

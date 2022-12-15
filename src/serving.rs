@@ -3,7 +3,6 @@ pub mod grpc;
 
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
-
 use std::sync::{Arc, RwLock};
 
 use zebra_chain::parameters::Network;

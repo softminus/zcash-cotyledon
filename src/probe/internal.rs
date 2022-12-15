@@ -1,15 +1,14 @@
-use futures_util::StreamExt;
-
 use std::collections::HashSet;
 use std::net::SocketAddr;
-
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
-use tokio::sync::Semaphore;
-use tokio::time::{sleep, timeout};
+use futures_util::StreamExt;
 
 use tower::Service;
+
+use tokio::sync::Semaphore;
+use tokio::time::{sleep, timeout};
 
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;

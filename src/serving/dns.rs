@@ -1,7 +1,8 @@
-use futures_util::StreamExt;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+
+use futures_util::StreamExt;
 
 use trust_dns_server::authority::MessageResponseBuilder;
 use trust_dns_server::client::rr as dnsrr;
