@@ -1,35 +1,14 @@
-use grpc_protocol::{SeedReply, SeedRequest};
 use crate::serving::ServingNodes;
 use grpc_protocol::seeder_server::Seeder;
-
-
-
-
-
-
-
-
+use grpc_protocol::{SeedReply, SeedRequest};
 
 use std::sync::{Arc, RwLock};
 
-
-
-
-
 use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
-
-
-
-
-
-
-
-
 
 pub mod grpc_protocol {
     tonic::include_proto!("seeder"); // The string specified here must match the proto package name
 }
-
 
 #[derive(Debug)]
 pub struct SeedContext {

@@ -1,34 +1,18 @@
+use crate::probe::classify::dns_servable;
+use crate::serving::ServingNodes;
 use trust_dns_server::authority::MessageResponseBuilder;
 use trust_dns_server::client::rr as dnsrr;
 use trust_dns_server::proto::op as dnsop;
 use trust_dns_server::server as dns;
-use crate::serving::ServingNodes;
-use crate::probe::classify::dns_servable;
-
 
 use futures_util::StreamExt;
 
-
-
-
-use std::net::{IpAddr};
+use std::net::IpAddr;
 
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
-
-
-
-
-
-
-
 use zebra_chain::parameters::Network;
-
-
-
-
-
 
 #[derive(Clone, Debug)]
 pub struct DnsContext {
@@ -150,4 +134,3 @@ impl DnsContext {
         Some(response_handle.send_response(response).await.unwrap())
     }
 }
-

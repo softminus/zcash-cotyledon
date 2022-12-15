@@ -1,27 +1,22 @@
 use crate::probe::ProbeResult;
 
-
 use futures_util::StreamExt;
 
-
-
-use std::collections::{HashSet};
-use std::net::{SocketAddr};
-
+use std::collections::HashSet;
+use std::net::SocketAddr;
 
 use std::sync::{Arc, LazyLock};
-use std::time::{Duration};
+use std::time::Duration;
 
 use tokio::sync::Semaphore;
 use tokio::time::{sleep, timeout};
-
 
 use tower::Service;
 use zebra_chain::block::{Hash, Height};
 use zebra_chain::parameters::Network;
 use zebra_chain::serialization::SerializationError;
 use zebra_consensus::CheckpointList;
-use zebra_network::types::{PeerServices};
+use zebra_network::types::PeerServices;
 use zebra_network::{
     connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
 };
@@ -64,7 +59,6 @@ pub enum HeadersProbeResult {
     HeadersOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok and valid_headers_reply_ok
 }
 
-
 #[derive(Debug, Clone)]
 pub enum NegotiationProbeResult {
     // Error on our host (too many FDs, etc), retryable and says nothing about the host or the network
@@ -79,7 +73,6 @@ pub enum NegotiationProbeResult {
     // Protocol negotiation went OK
     ProtocolOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok
 }
-
 
 #[derive(Debug, Clone)]
 pub struct PeerDerivedData {
@@ -149,9 +142,6 @@ pub static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| 
     }
     proband_hashes
 });
-
-
-
 
 // TCPFailure errors:
 // Os { code: 60, kind: TimedOut, message: "Operation timed out" }
@@ -256,8 +246,6 @@ fn classify_zebra_network_errors(
         returned_error
     ))
 }
-
-
 
 pub async fn hash_probe_inner(
     peer_addr: SocketAddr,
@@ -383,10 +371,6 @@ pub async fn hash_probe_inner(
     }
 }
 
-
-
-
-
 async fn headers_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
@@ -464,14 +448,19 @@ async fn headers_probe_inner(
                     // println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
                     // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
                     // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
-                    let headers_request = Request::FindHeaders {known_blocks: headers_vec, stop: None};
-                    let headers_query_response = good_connection
-                        .call(headers_request.clone())
-                        .await;
+                    let headers_request = Request::FindHeaders {
+                        known_blocks: headers_vec,
+                        stop: None,
+                    };
+                    let headers_query_response =
+                        good_connection.call(headers_request.clone()).await;
                     //println!("headers query response is {:?}", headers_query_response);
                     match headers_query_response {
                         Err(protocol_error) => {
-                            println!("protocol failure after requesting headers with peer {}: {:?}", peer_addr, protocol_error);
+                            println!(
+                                "protocol failure after requesting headers with peer {}: {:?}",
+                                peer_addr, protocol_error
+                            );
                             // so far the only errors we've seen here look like one of these, and it's fine to ascribe them to BlockRequestFail and not to ProtocolBad
                             // SharedPeerError(ConnectionClosed)
                             // SharedPeerError(ConnectionReceiveTimeout)
@@ -479,7 +468,10 @@ async fn headers_probe_inner(
                             return HeadersProbeResult::HeadersFail(peer_derived_data);
                         }
                         Ok(headers_query_protocol_response) => {
-                            println!("Headers request gave us {:?}", headers_query_protocol_response);
+                            println!(
+                                "Headers request gave us {:?}",
+                                headers_query_protocol_response
+                            );
                             return HeadersProbeResult::HeadersOK(peer_derived_data);
                         }
                     }
@@ -488,8 +480,6 @@ async fn headers_probe_inner(
         }
     }
 }
-
-
 
 pub async fn probe_for_peers_two(
     peer_addr: SocketAddr,
@@ -567,6 +557,3 @@ pub async fn probe_for_peers_two(
         },
     }
 }
-
-
-

@@ -1,39 +1,21 @@
-pub mod grpc;
 pub mod dns;
-
-
-
-
-
+pub mod grpc;
 
 use std::collections::{HashMap, HashSet};
-use std::net::{SocketAddr};
-
+use std::net::SocketAddr;
 
 use std::sync::{Arc, RwLock};
 
-
-
-
-
-
-
-
 use zebra_chain::parameters::Network;
 
-
-
-
+use crate::probe::classify::{get_classification, PeerStats};
 use crate::probe::PeerClassification;
-use crate::probe::classify::PeerStats;
-use crate::probe::classify::get_classification;
 
 #[derive(Debug, Clone, Default)]
 pub struct ServingNodes {
     pub primaries: HashSet<SocketAddr>,
     pub alternates: HashSet<SocketAddr>,
 }
-
 
 pub fn update_serving_nodes(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,

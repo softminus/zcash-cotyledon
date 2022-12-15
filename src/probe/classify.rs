@@ -1,37 +1,20 @@
 use crate::probe::PeerClassification;
 
-
 use futures_util::StreamExt;
 
-
-
-
-use std::net::{SocketAddr};
-
-
+use std::net::SocketAddr;
 
 use std::time::{Duration, SystemTime};
 
-
-
-
-
-
-use zebra_chain::block::{Height};
+use zebra_chain::block::Height;
 use zebra_chain::parameters::Network;
 
-
-use zebra_network::types::{PeerServices};
-use zebra_network::{
-    Version,
-};
+use zebra_network::types::PeerServices;
+use zebra_network::Version;
 
 use crate::probe::internal::PeerDerivedData;
 
-use crate::probe::internal::REQUIRED_MAINNET_HEIGHT;
-use crate::probe::internal::REQUIRED_TESTNET_HEIGHT;
-
-
+use crate::probe::internal::{REQUIRED_MAINNET_HEIGHT, REQUIRED_TESTNET_HEIGHT};
 
 #[derive(Debug, Clone)]
 pub struct PeerStats {
@@ -63,7 +46,6 @@ struct EWMAState {
     count: f64,
     reliability: f64,
 }
-
 
 fn ancillary_checks_all_good(
     peer_derived_data: &PeerDerivedData,
@@ -215,9 +197,6 @@ pub fn get_classification(
     }
 }
 
-
-
-
 impl Default for EWMAPack {
     fn default() -> Self {
         EWMAPack {
@@ -276,7 +255,6 @@ pub fn update_ewma_pack(
     update_ewma(&mut prev.stat_1week, sample_age, sample);
     update_ewma(&mut prev.stat_1month, sample_age, sample);
 }
-
 
 fn required_height(network: Network) -> Height {
     match network {

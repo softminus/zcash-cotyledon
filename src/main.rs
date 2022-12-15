@@ -2,53 +2,38 @@
 #![feature(io_error_uncategorized)]
 #![feature(io_error_more)]
 #![feature(once_cell)]
-mod serving;
 mod probe;
+mod serving;
+use crate::serving::grpc::grpc_protocol::seeder_server::SeederServer;
 use futures::Future;
 use futures_util::stream::FuturesUnordered;
 use futures_util::StreamExt;
 use rand::Rng;
 use rlimit::{getrlimit, increase_nofile_limit, Resource};
-use crate::serving::grpc::grpc_protocol::seeder_server::{Seeder, SeederServer};
-use std::collections::{HashMap, HashSet};
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::collections::HashMap;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::pin::Pin;
-use std::str::FromStr;
-use std::sync::{Arc, LazyLock, RwLock};
+
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime};
 use tokio::net::{TcpListener, UdpSocket};
 use tokio::sync::Semaphore;
-use tokio::time::{sleep, timeout};
+use tokio::time::sleep;
 use tonic::transport::Server;
-use tonic::{Request as TonicRequest, Response as TonicResponse, Status};
-use tower::Service;
-use zebra_chain::block::{Hash, Height};
-use zebra_chain::parameters::Network;
-use zebra_chain::serialization::SerializationError;
-use zebra_consensus::CheckpointList;
-use zebra_network::types::{MetaAddr, PeerServices};
-use zebra_network::{
-    connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
-};
 
-use crate::probe::PeerClassification;
-use crate::probe::ProbeResult;
-use crate::serving::ServingNodes;
-use crate::serving::grpc::SeedContext;
-use crate::serving::dns::DnsContext;
-use crate::probe::Timeouts;
-use crate::serving::update_serving_nodes;
-use crate::probe::classify::PeerStats;
-use crate::probe::classify::get_classification;
-use crate::probe::hash_probe_and_update;
+use zebra_chain::parameters::Network;
+
+use crate::probe::classify::{get_classification, PeerStats};
 use crate::probe::internal::probe_for_peers_two;
-use crate::serving::single_node_update;
+use crate::probe::{hash_probe_and_update, PeerClassification, ProbeResult, Timeouts};
+use crate::serving::dns::DnsContext;
+use crate::serving::grpc::SeedContext;
+use crate::serving::{single_node_update, update_serving_nodes, ServingNodes};
 
 enum CrawlingMode {
     FastAcquisition,
     LongTermUpdates,
 }
-
 
 #[tokio::main]
 async fn main() {

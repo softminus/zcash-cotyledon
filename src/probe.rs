@@ -3,28 +3,17 @@ pub mod internal;
 
 use internal::BlockProbeResult;
 
+use std::net::SocketAddr;
 
-
-
-
-
-
-use std::net::{SocketAddr};
-
-
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use tokio::sync::Semaphore;
-use tokio::time::{sleep};
-
-
-
+use tokio::time::sleep;
 
 use zebra_chain::parameters::Network;
 
-
-use zebra_network::types::{MetaAddr};
+use zebra_network::types::MetaAddr;
 
 use crate::probe::classify::PeerStats;
 
@@ -33,9 +22,8 @@ pub struct Timeouts {
     pub peers_timeout: Duration,
 }
 
-use crate::probe::classify::EWMAPack;
+use crate::probe::classify::{update_ewma_pack, EWMAPack};
 use crate::probe::internal::hash_probe_inner;
-use crate::probe::classify::update_ewma_pack;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PeerClassification {
     Unknown,               // We got told about this node but haven't yet queried it
@@ -58,7 +46,7 @@ pub enum ProbeResult {
 pub enum ProbeType {
     Block,
     Headers,
-    Negotation
+    Negotation,
 }
 
 async fn ewma_probe_and_update(
@@ -68,7 +56,7 @@ async fn ewma_probe_and_update(
     timeouts: &Timeouts,
     random_delay: Duration,
     semaphore: Arc<Semaphore>,
-    _probe_type: ProbeType
+    _probe_type: ProbeType,
 ) -> (SocketAddr, ProbeResult) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
     let mut new_peer_stats = match old_stats {
@@ -123,14 +111,12 @@ async fn ewma_probe_and_update(
                 false,
             );
             new_peer_stats.last_polled = Some(current_poll_time);
-
         }
         BlockProbeResult::BlockRequestFail(new_peer_data) => {
             new_peer_stats.total_attempts += 1;
             new_peer_stats.tcp_connections_ok += 1;
             new_peer_stats.protocol_negotiations_ok += 1;
             new_peer_stats.valid_block_reply_ok += 0;
-
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
 
@@ -142,7 +128,6 @@ async fn ewma_probe_and_update(
             );
             new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
             new_peer_stats.last_polled = Some(current_poll_time);
-
         }
         BlockProbeResult::BlockRequestOK(new_peer_data) => {
             new_peer_stats.total_attempts += 1;
@@ -161,15 +146,12 @@ async fn ewma_probe_and_update(
             new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
             new_peer_stats.last_block_success = Some(current_poll_time);
 
-            println!("new ewma pack is {:?}",new_peer_stats.ewma_pack)
+            println!("new ewma pack is {:?}", new_peer_stats.ewma_pack)
         }
     }
     new_peer_stats.last_polled = Some(current_poll_time);
     return (proband_address, ProbeResult::Result(new_peer_stats));
 }
-
-
-
 
 pub async fn hash_probe_and_update(
     proband_address: SocketAddr,
@@ -232,14 +214,12 @@ pub async fn hash_probe_and_update(
                 false,
             );
             new_peer_stats.last_polled = Some(current_poll_time);
-
         }
         BlockProbeResult::BlockRequestFail(new_peer_data) => {
             new_peer_stats.total_attempts += 1;
             new_peer_stats.tcp_connections_ok += 1;
             new_peer_stats.protocol_negotiations_ok += 1;
             new_peer_stats.valid_block_reply_ok += 0;
-
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
 
@@ -251,7 +231,6 @@ pub async fn hash_probe_and_update(
             );
             new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
             new_peer_stats.last_polled = Some(current_poll_time);
-
         }
         BlockProbeResult::BlockRequestOK(new_peer_data) => {
             new_peer_stats.total_attempts += 1;
@@ -270,7 +249,7 @@ pub async fn hash_probe_and_update(
             new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
             new_peer_stats.last_block_success = Some(current_poll_time);
 
-            println!("new ewma pack is {:?}",new_peer_stats.ewma_pack)
+            println!("new ewma pack is {:?}", new_peer_stats.ewma_pack)
         }
     }
     new_peer_stats.last_polled = Some(current_poll_time);
