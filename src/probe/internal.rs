@@ -245,7 +245,7 @@ fn classify_zebra_network_errors(
     ))
 }
 
-pub async fn hash_probe_inner(
+pub(super) async fn hash_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
     connection_timeout: Duration,
@@ -369,7 +369,7 @@ pub async fn hash_probe_inner(
     }
 }
 
-async fn headers_probe_inner(
+pub(super) async fn headers_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
     connection_timeout: Duration,
@@ -478,6 +478,86 @@ async fn headers_probe_inner(
         }
     }
 }
+
+
+pub(super) async fn negotiation_probe_inner(
+    peer_addr: SocketAddr,
+    network: Network,
+    connection_timeout: Duration,
+) -> NegotiationProbeResult {
+    println!(
+        "Starting new protocol negotiation probe connection: peer addr is {:?}",
+        peer_addr
+    );
+    let connection = connect_isolated_tcp_direct(
+        network,
+        peer_addr,
+        String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
+    );
+    let connection = timeout(connection_timeout, connection);
+    let connection = connection.await;
+
+    match connection {
+        Err(timeout_error) => {
+            println!(
+                "Negotiation test connection with {:?} failed due to user-defined timeout of {:?}: {:?}",
+                peer_addr, connection_timeout, timeout_error
+            );
+            NegotiationProbeResult::TCPFailure // this counts as network brokenness, should not count as BeyondUseless, just regular Bad
+        }
+        Ok(connection_might_have_failed) => {
+            match connection_might_have_failed {
+                Err(connection_failure) => {
+                    let error_classification = classify_zebra_network_errors(&connection_failure);
+
+                    match error_classification {
+                        ErrorFlavor::Ephemeral(msg) => {
+                            println!(
+                                "Negotiation test connection with {:?} got an ephemeral error: {:?}",
+                                peer_addr, msg
+                            );
+                            NegotiationProbeResult::MustRetry
+                        }
+                        ErrorFlavor::Network(msg) => {
+                            println!(
+                                "Headers test connection with {:?} got an network error: {:?}",
+                                peer_addr, msg
+                            );
+                            NegotiationProbeResult::TCPFailure
+                        }
+                        ErrorFlavor::Protocol(msg) => {
+                            println!(
+                                "Headers test connection with {:?} got an protocol error: {:?}",
+                                peer_addr, msg
+                            );
+                            NegotiationProbeResult::ProtocolBad
+                        }
+                    }
+                }
+                Ok(good_connection) => {
+                    let numeric_version = good_connection.connection_info.remote.version;
+                    let peer_services = good_connection.connection_info.remote.services;
+                    let peer_height = good_connection.connection_info.remote.start_height;
+                    let _user_agent = good_connection.connection_info.remote.user_agent.clone();
+                    let _relay = good_connection.connection_info.remote.relay;
+                    let peer_derived_data = PeerDerivedData {
+                        numeric_version,
+                        peer_services,
+                        peer_height,
+                        _user_agent,
+                        _relay,
+                    };
+                    // println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
+                    // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
+                    // println!("remote peer height @ time of connection: {:?}", z.connection_info.remote.start_height >= Height(1_700_000));
+                    return NegotiationProbeResult::ProtocolOK(peer_derived_data);
+                }
+            }
+        }
+    }
+}
+
+
 
 pub async fn probe_for_peers_two(
     peer_addr: SocketAddr,
