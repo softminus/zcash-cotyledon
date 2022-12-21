@@ -13,22 +13,25 @@ use crate::probe::internal::{PeerDerivedData, REQUIRED_MAINNET_HEIGHT, REQUIRED_
 use crate::probe::PeerClassification;
 
 #[derive(Debug, Clone)]
+
+
+pub struct ProbeStat {
+    pub attempt_count: u64,
+    pub success_count: u64,
+    pub last_success: Option<SystemTime>,
+    pub last_polled:  Option<SystemTime>
+}
+
 pub struct PeerStats {
     pub ewma_pack: EWMAPack,
 
-    pub total_attempts: u64,
-    pub last_polled: Option<SystemTime>,
+    pub tcp_connection: ProbeStat,
 
-    pub tcp_connections_ok: u64,
+    pub protocol_negotiation: ProbeStat,
 
-    pub valid_protocol_negotiations: u64,
-    pub last_protocol_negotiation: Option<SystemTime>,
+    pub block_probe: ProbeStat,
 
-    pub valid_block_reply: u64,
-    pub last_valid_block_reply: Option<SystemTime>,
-
-    pub valid_header_replies: u64,
-    pub last_valid_header_reply: Option<SystemTime>,
+    pub header_probe: ProbeStat,
 
     pub peer_derived_data: Option<PeerDerivedData>,
 }
