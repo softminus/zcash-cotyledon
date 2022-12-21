@@ -14,14 +14,21 @@ use crate::probe::PeerClassification;
 
 #[derive(Debug, Clone)]
 pub struct PeerStats {
-    pub total_attempts: u64,
-    pub tcp_connections_ok: u64,
-    pub protocol_negotiations_ok: u64,
-    pub valid_block_reply_ok: u64,
     pub ewma_pack: EWMAPack,
+
+    pub total_attempts: u64,
     pub last_polled: Option<SystemTime>,
+
+    pub tcp_connections_ok: u64,
+
+    pub valid_protocol_negotiations: u64,
     pub last_protocol_negotiation: Option<SystemTime>,
-    pub last_block_success: Option<SystemTime>,
+
+    pub valid_block_reply: u64,
+    pub last_valid_block_reply: Option<SystemTime>,
+
+    pub valid_header_replies: u64,
+    pub last_valid_header_reply: Option<SystemTime>,
 
     pub peer_derived_data: Option<PeerDerivedData>,
 }
