@@ -45,7 +45,7 @@ pub enum ProbeType {
     Negotiation,
 }
 
-async fn ewma_probe_and_update(
+async fn probe_and_update(
     proband_address: SocketAddr,
     old_stats: Option<PeerStats>,
     network: Network,
