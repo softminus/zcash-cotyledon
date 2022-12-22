@@ -57,8 +57,8 @@ pub struct ProbeConfiguration {
 }
 
 
-pub fn all_good_test(peer_stats: &PeerStats, network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
-    if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+pub fn all_good_test(peer_stats: &PeerStats, _network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
+    if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
         // negotiating the protocol at least once rules out Unknown and BeyondUseless
         // therefore, the node is one of {AllGood, MerelySyncedEnough, EventuallyMaybeSynced, GenericBad}
         // we test in the order of decreasing stringency, and return whenever we meet all the criteria for a condition
@@ -149,8 +149,8 @@ pub fn get_classification(
 }
 
 
-pub fn merely_synced_test(peer_stats: &PeerStats, network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
-    if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+pub fn merely_synced_test(peer_stats: &PeerStats, _network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
+    if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
         // MerelySyncedEnough test section
         // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
         if let Some(last_block_success) = peer_stats.block_probe.last_success {
@@ -164,8 +164,8 @@ pub fn merely_synced_test(peer_stats: &PeerStats, network: Network, probes_confi
     return None;
 }
 
-pub fn eventually_maybe_test(peer_stats: &PeerStats, network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
-    if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+pub fn eventually_maybe_test(peer_stats: &PeerStats, _network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
+    if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
         // EventuallyMaybeSynced test section
         // if last protocol negotiation was more than 24 hours ago, this is not worth special attention, keep polling it at the slower rate
         if let Some(last_protocol_negotiation) = peer_stats.protocol_negotiation.last_success {
@@ -179,7 +179,7 @@ pub fn eventually_maybe_test(peer_stats: &PeerStats, network: Network, probes_co
     return None;
 }
 
-pub fn beyond_useless_test(peer_stats: &PeerStats, network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
+pub fn beyond_useless_test(peer_stats: &PeerStats, _network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
     if peer_stats.tcp_connection.attempt_count > probes_config.beyond_useless_count_threshold
         && peer_stats.protocol_negotiation.success_count == 0 {
         return Some(PeerClassification::BeyondUseless);
