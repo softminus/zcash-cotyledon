@@ -112,13 +112,13 @@ pub static HASH_CHECKPOINTS_TESTNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| 
 // Os { code: 49, kind: AddrNotAvailable, message: "Can't assign requested address" }
 
 #[derive(Debug, Clone)]
-enum ErrorFlavor {
+pub enum ErrorFlavor {
     Network(String),
     Ephemeral(String),
     Protocol(String),
 }
 
-fn classify_zebra_network_errors(
+pub fn classify_zebra_network_errors(
     returned_error: &Box<dyn std::error::Error + std::marker::Send + Sync>,
 ) -> ErrorFlavor {
     if let Some(io_error) = returned_error.downcast_ref::<std::io::Error>() {
