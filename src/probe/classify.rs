@@ -61,6 +61,22 @@ struct EWMAState {
     reliability: f64,
 }
 
+
+
+pub enum AugmentedProbeTypes {
+    Block,
+    Headers,
+    Negotiation,
+    NumericVersion,
+    UserAgent,
+    PeerHeight
+}
+
+
+pub struct ProbeConfiguration {
+    ewma_probe: AugmentedProbeTypes,
+    gating_probes: Vec<AugmentedProbeTypes>
+}
 fn ancillary_checks_all_good(
     peer_derived_data: &PeerDerivedData,
     peer_address: &SocketAddr,
