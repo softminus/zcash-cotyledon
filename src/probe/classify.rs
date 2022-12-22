@@ -104,7 +104,7 @@ pub fn get_classification(
     peer_stats: &Option<PeerStats>,
     peer_address: &SocketAddr,
     network: Network,
-    probes_config: ProbeConfiguration
+    probes_config: &ProbeConfiguration
 ) -> PeerClassification {
 
     // generic logic, rule out never having attempted this peer
@@ -119,25 +119,25 @@ pub fn get_classification(
         return PeerClassification::Unknown;
     }
 
-    if let Some(all_good) = all_good_test(peer_stats, network, probes_config) {
+    if let Some(all_good) = all_good_test(peer_stats, network, &probes_config) {
         if check_gating(peer_stats, network, probes_config.all_good_gating_probes) {
             return all_good;
         }
     }
 
-    if let Some(merely) = merely_synced_test(peer_stats, network, probes_config) {
+    if let Some(merely) = merely_synced_test(peer_stats, network, &probes_config) {
         if check_gating(peer_stats, network, probes_config.merely_synced_gating_probes) {
             return merely;
         }
     }
 
-    if let Some(maybe) = eventually_maybe_test(peer_stats, network, probes_config) {
+    if let Some(maybe) = eventually_maybe_test(peer_stats, network, &probes_config) {
         if check_gating(peer_stats, network, probes_config.eventually_maybe_gating_probes) {
             return maybe;
         }
     }
 
-    if let Some(beyond_useless) = beyond_useless_test(peer_stats, network, probes_config) {
+    if let Some(beyond_useless) = beyond_useless_test(peer_stats, network, &probes_config) {
         return beyond_useless;
     }
 
