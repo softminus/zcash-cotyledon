@@ -48,9 +48,11 @@ pub enum AugmentedProbeTypes {
 pub struct ProbeConfiguration {
     ewma_probe: ProbeType,
     all_good_gating_probes: Vec<AugmentedProbeTypes>,
-    merely_synced_gating_probes: Vec<AugmentedProbeTypes>
-    eventually_maybe_gating_probes: Vec<AugmentedProbeTypes>
-
+    merely_synced_gating_probes: Vec<AugmentedProbeTypes>,
+    eventually_maybe_gating_probes: Vec<AugmentedProbeTypes>,
+    merely_synced_timeout: Duration,
+    eventually_synced_timeout: Duration,
+    beyond_useless_count_threshold: u64,
 }
 
 
