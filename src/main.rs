@@ -27,7 +27,6 @@ use tonic::transport::Server;
 use zebra_chain::parameters::Network;
 
 use crate::probe::classify::{get_classification, PeerStats};
-use crate::probe::internal::probe_for_peers_two;
 use crate::probe::{hash_probe_and_update, PeerClassification, ProbeResult, Timeouts};
 
 use crate::serving::dns::DnsContext;

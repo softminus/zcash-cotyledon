@@ -20,7 +20,8 @@ use zebra_network::{
 };
 
 use crate::probe::{ProbeResult, Timeouts};
-
+use crate::probe::internal::{ErrorFlavor, classify_zebra_network_errors, PeerDerivedData};
+use crate::probe::internal::{HASH_CHECKPOINTS_MAINNET, HASH_CHECKPOINTS_TESTNET};
 
 #[derive(Debug, Clone)]
 pub enum HeadersProbeResult {
