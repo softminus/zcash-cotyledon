@@ -1,25 +1,25 @@
 use std::collections::HashSet;
 use std::net::SocketAddr;
-use std::sync::{Arc, LazyLock};
+
 use std::time::Duration;
 
 use futures_util::StreamExt;
 
 use tower::Service;
 
-use tokio::sync::Semaphore;
-use tokio::time::{sleep, timeout};
 
-use zebra_chain::block::{Hash, Height};
+use tokio::time::{timeout};
+
+
 use zebra_chain::parameters::Network;
-use zebra_chain::serialization::SerializationError;
-use zebra_consensus::CheckpointList;
-use zebra_network::types::PeerServices;
+
+
+
 use zebra_network::{
-    connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
+    connect_isolated_tcp_direct, InventoryResponse, Request, Response,
 };
 
-use crate::probe::{ProbeResult, Timeouts};
+
 use crate::probe::common::{ErrorFlavor, classify_zebra_network_errors, PeerDerivedData};
 use crate::probe::common::{HASH_CHECKPOINTS_MAINNET, HASH_CHECKPOINTS_TESTNET};
 

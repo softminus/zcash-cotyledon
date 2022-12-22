@@ -1,16 +1,16 @@
-use std::net::SocketAddr;
+
 use std::time::{Duration, SystemTime};
 
 use futures_util::StreamExt;
 
-use zebra_chain::block::Height;
-use zebra_chain::parameters::Network;
 
-use zebra_network::types::PeerServices;
-use zebra_network::Version;
 
-use crate::probe::common::{PeerDerivedData, REQUIRED_MAINNET_HEIGHT, REQUIRED_TESTNET_HEIGHT};
-use crate::probe::PeerClassification;
+
+
+
+
+
+
 use crate::probe::classify::ProbeStat;
 
 

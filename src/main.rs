@@ -7,32 +7,32 @@ mod serving;
 
 use std::collections::HashMap;
 use std::net::{SocketAddr, ToSocketAddrs};
-use std::pin::Pin;
+
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration};
 
-use rand::Rng;
 
-use futures::Future;
-use futures_util::stream::FuturesUnordered;
+
+
+
 use futures_util::StreamExt;
 
 use rlimit::{getrlimit, increase_nofile_limit, Resource};
 
 use tokio::net::{TcpListener, UdpSocket};
-use tokio::sync::Semaphore;
+
 use tokio::time::sleep;
 use tonic::transport::Server;
 
 use zebra_chain::parameters::Network;
 
-use crate::probe::classify::{get_classification, PeerStats};
-use crate::probe::{PeerClassification, ProbeResult, Timeouts};
+use crate::probe::classify::{PeerStats};
+use crate::probe::{Timeouts};
 
 use crate::serving::dns::DnsContext;
 use crate::serving::grpc::grpc_protocol::seeder_server::SeederServer;
 use crate::serving::grpc::SeedContext;
-use crate::serving::{single_node_update, update_serving_nodes, ServingNodes};
+use crate::serving::{ServingNodes};
 
 enum CrawlingMode {
     FastAcquisition,

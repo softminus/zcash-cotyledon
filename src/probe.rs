@@ -16,7 +16,7 @@ use zebra_chain::parameters::Network;
 use zebra_network::types::MetaAddr;
 
 use crate::probe::classify::PeerStats;
-use crate::probe::ewma::{update_ewma_pack, EWMAPack, probe_stat_update};
+use crate::probe::ewma::{update_ewma_pack, probe_stat_update};
 use crate::probe::{block::block_probe_inner, headers::headers_probe_inner, protocol::negotiation_probe_inner};
 use crate::probe::{headers::HeadersProbeResult, block::BlockProbeResult, protocol::NegotiationProbeResult};
 
