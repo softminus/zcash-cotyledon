@@ -119,7 +119,12 @@ pub fn get_classification(
     }
 
     if let Some(all_good) = all_good_test(peer_stats, network, &probes_config) {
-        return check_gating(peer_stats, all_good, network, &probes_config.all_good_gating_probes)
+        return check_gating(
+            peer_stats,
+            all_good,
+            network,
+            &probes_config.all_good_gating_probes,
+        );
     }
 
     if let Some(merely) = merely_synced_test(peer_stats, network, &probes_config) {
@@ -209,27 +214,36 @@ fn check_gating(
 ) -> PeerClassification {
     for probe in gating_probes {
         if !match probe {
-            AugmentedProbeTypes::Block => {gating_check_block(peer_stats, candidate_classification, network)},
-            AugmentedProbeTypes::Headers => {gating_check_headers(peer_stats, candidate_classification, network)},
-            AugmentedProbeTypes::Negotiation => {gating_check_negotiation(peer_stats, candidate_classification, network)},
-            AugmentedProbeTypes::NumericVersion =>{gating_check_numeric_version(peer_stats, candidate_classification, network)},
-            AugmentedProbeTypes::UserAgent =>{gating_check_user_agent(peer_stats, candidate_classification, network)},
-            AugmentedProbeTypes::PeerHeight =>{gating_check_peer_height(peer_stats, candidate_classification, network)},
+            AugmentedProbeTypes::Block => {
+                gating_check_block(peer_stats, candidate_classification, network)
             }
-            {
-                return PeerClassification::GenericBad;
+            AugmentedProbeTypes::Headers => {
+                gating_check_headers(peer_stats, candidate_classification, network)
             }
+            AugmentedProbeTypes::Negotiation => {
+                gating_check_negotiation(peer_stats, candidate_classification, network)
+            }
+            AugmentedProbeTypes::NumericVersion => {
+                gating_check_numeric_version(peer_stats, candidate_classification, network)
+            }
+            AugmentedProbeTypes::UserAgent => {
+                gating_check_user_agent(peer_stats, candidate_classification, network)
+            }
+            AugmentedProbeTypes::PeerHeight => {
+                gating_check_peer_height(peer_stats, candidate_classification, network)
+            }
+        } {
+            return PeerClassification::GenericBad;
+        }
     }
     return candidate_classification;
 }
-
 
 fn gating_check_block(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-) -> bool
-{
+) -> bool {
     todo!();
 }
 
@@ -237,8 +251,7 @@ fn gating_check_headers(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-) -> bool
-{
+) -> bool {
     todo!();
 }
 
@@ -246,8 +259,7 @@ fn gating_check_negotiation(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-) -> bool
-{
+) -> bool {
     todo!();
 }
 
@@ -255,8 +267,7 @@ fn gating_check_numeric_version(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-) -> bool
-{
+) -> bool {
     todo!();
 }
 
@@ -264,8 +275,7 @@ fn gating_check_user_agent(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-) -> bool
-{
+) -> bool {
     todo!();
 }
 
@@ -273,11 +283,9 @@ fn gating_check_peer_height(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-) -> bool
-{
+) -> bool {
     todo!();
 }
-
 
 fn ancillary_checks_all_good(
     peer_derived_data: &PeerDerivedData,
