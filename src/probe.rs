@@ -68,17 +68,17 @@ async fn probe_and_update(
     let permit = semaphore.acquire_owned().await.unwrap();
     let current_poll_time = SystemTime::now(); // sample time here, in case peer req takes a while
     let probe_result_generic = match probe_type {
-        Block       => {
+        ProbeType::Block       => {
             let probe_res = block_probe_inner(proband_address, network, timeouts.hash_timeout).await;
             drop(permit);
             block_probe_update(probe_res, current_poll_time, &mut new_peer_stats)
         },
-        Headers     => {
+        ProbeType::Headers     => {
             let probe_res = headers_probe_inner(proband_address, network, timeouts.hash_timeout).await;
             drop(permit);
             headers_probe_update(probe_res, current_poll_time, &mut new_peer_stats)
         },
-        Negotiation => {
+        ProbeType::Negotiation => {
             let probe_res = negotiation_probe_inner(proband_address, network, timeouts.hash_timeout).await;
             drop(permit);
             negotiation_probe_update(probe_res, current_poll_time, &mut new_peer_stats)
