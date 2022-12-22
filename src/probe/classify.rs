@@ -74,10 +74,9 @@ pub fn all_good_test(peer_stats: &Option<PeerStats>, network: Network, probes_co
             ProbeType::Block => peer_stats.block_probe,
             ProbeType::Headers => peer_stats.header_probe,
             ProbeType::Negotiation => peer_stats.protocol_negotiation,
-
-        }
-        if probe_stat.total_attempts <= 3
-            && probe_stat.valid_block_reply_ok * 2 >= probe_stat.total_attempts
+        };
+        if probe_stat.attempt_count <= 3
+            && probe_stat.success_count * 2 >= probe_stat.attempt_count
         {
             return Some(PeerClassification::AllGood);
         }
