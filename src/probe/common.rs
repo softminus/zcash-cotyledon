@@ -16,7 +16,7 @@ use zebra_chain::serialization::SerializationError;
 use zebra_consensus::CheckpointList;
 use zebra_network::types::PeerServices;
 use zebra_network::{
-    connect_isolated_tcp_direct, HandshakeError, InventoryResponse, Request, Response, Version,
+    connect_isolated_tcp_direct, HandshakeError, Request, Version,
 };
 
 use crate::probe::{ProbeResult, Timeouts};
