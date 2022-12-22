@@ -145,14 +145,13 @@ fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime
             probe_stat_update(new_peer_stats.protocol_negotiation, true, current_poll_time);
             probe_stat_update(new_peer_stats.block_probe,          true, current_poll_time);
 
-
-            new_peer_stats.peer_derived_data = Some(new_peer_data);
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
                 current_poll_time,
                 true,
             );
+            new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
         }
     }
@@ -172,7 +171,6 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
             probe_stat_update(new_peer_stats.protocol_negotiation, false, current_poll_time);
             probe_stat_update(new_peer_stats.header_probe,         false, current_poll_time);
 
-
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
@@ -185,7 +183,6 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
             probe_stat_update(new_peer_stats.tcp_connection,       true,  current_poll_time);
             probe_stat_update(new_peer_stats.protocol_negotiation, false, current_poll_time);
             probe_stat_update(new_peer_stats.header_probe,         false, current_poll_time);
-
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -200,14 +197,13 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
             probe_stat_update(new_peer_stats.protocol_negotiation, true, current_poll_time);
             probe_stat_update(new_peer_stats.header_probe,         false, current_poll_time);
 
-            new_peer_stats.peer_derived_data = Some(new_peer_data);
-
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
                 current_poll_time,
                 false,
             );
+            new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
         }
         HeadersProbeResult::HeadersOK(new_peer_data) => {
@@ -215,14 +211,13 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
             probe_stat_update(new_peer_stats.protocol_negotiation, true, current_poll_time);
             probe_stat_update(new_peer_stats.header_probe,         true, current_poll_time);
 
-
-            new_peer_stats.peer_derived_data = Some(new_peer_data);
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
                 current_poll_time,
                 true,
             );
+            new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
         }
     }
@@ -252,7 +247,6 @@ fn negotiation_probe_update(probe_res: NegotiationProbeResult, current_poll_time
             probe_stat_update(new_peer_stats.tcp_connection,       true, current_poll_time);
             probe_stat_update(new_peer_stats.protocol_negotiation, false, current_poll_time);
 
-
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
@@ -266,13 +260,13 @@ fn negotiation_probe_update(probe_res: NegotiationProbeResult, current_poll_time
             probe_stat_update(new_peer_stats.protocol_negotiation, true, current_poll_time);
 
 
-            new_peer_stats.peer_derived_data = Some(new_peer_data);
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.last_polled,
                 current_poll_time,
                 true,
             );
+            new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
         }
     }
