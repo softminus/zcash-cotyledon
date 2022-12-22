@@ -26,7 +26,7 @@ pub struct PeerStats {
 }
 
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct ProbeStat {
     pub attempt_count: u64,
     pub last_polled:  Option<SystemTime>,
@@ -35,6 +35,8 @@ pub struct ProbeStat {
     pub last_success: Option<SystemTime>,
 }
 
+
+#[derive(Debug, Clone, Copy)]
 pub enum AugmentedProbeTypes {
     Block,
     Headers,
@@ -43,7 +45,6 @@ pub enum AugmentedProbeTypes {
     UserAgent,
     PeerHeight
 }
-
 
 pub struct ProbeConfiguration {
     ewma_probe: ProbeType,
@@ -71,8 +72,8 @@ pub fn all_good_test(peer_stats: &PeerStats, network: Network, probes_config: &P
         let ewmas = peer_stats.ewma_pack;
 
         let probe_stat = match probes_config.ewma_probe {
-            ProbeType::Block => peer_stats.block_probe,
-            ProbeType::Headers => peer_stats.header_probe,
+            ProbeType::Block =>       peer_stats.block_probe,
+            ProbeType::Headers =>     peer_stats.header_probe,
             ProbeType::Negotiation => peer_stats.protocol_negotiation,
         };
         if probe_stat.attempt_count <= 3
@@ -120,19 +121,19 @@ pub fn get_classification(
     }
 
     if let Some(all_good) = all_good_test(peer_stats, network, &probes_config) {
-        if check_gating(peer_stats, network, probes_config.all_good_gating_probes) {
+        if check_gating(peer_stats, network, &probes_config.all_good_gating_probes) {
             return all_good;
         }
     }
 
     if let Some(merely) = merely_synced_test(peer_stats, network, &probes_config) {
-        if check_gating(peer_stats, network, probes_config.merely_synced_gating_probes) {
+        if check_gating(peer_stats, network, &probes_config.merely_synced_gating_probes) {
             return merely;
         }
     }
 
     if let Some(maybe) = eventually_maybe_test(peer_stats, network, &probes_config) {
-        if check_gating(peer_stats, network, probes_config.eventually_maybe_gating_probes) {
+        if check_gating(peer_stats, network, &probes_config.eventually_maybe_gating_probes) {
             return maybe;
         }
     }
@@ -186,6 +187,9 @@ pub fn beyond_useless_test(peer_stats: &PeerStats, network: Network, probes_conf
     return None;
 }
 
+fn check_gating(peer_stats: &PeerStats, network: Network, gating_probes: &Vec<AugmentedProbeTypes>) -> bool {
+    todo!();
+}
 
 fn ancillary_checks_all_good(
     peer_derived_data: &PeerDerivedData,
