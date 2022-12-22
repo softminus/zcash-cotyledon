@@ -58,18 +58,8 @@ async fn probe_and_update(
     probe_type: ProbeType,
 ) -> (SocketAddr, ProbeResult) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
-    let mut new_peer_stats = match old_stats {
-        None => PeerStats {
-            total_attempts: 0,
-            tcp_connections_ok: 0,
-            protocol_negotiations_ok: 0,
-            valid_block_reply_ok: 0,
-            ewma_pack: EWMAPack::default(),
-            last_polled: None,
-            last_protocol_negotiation: None,
-            last_block_success: None,
-            peer_derived_data: None,
-        },
+    let mut new_peer_stats: PeerStats = match old_stats {
+        None => Default::default(),
         Some(old_stats) => old_stats.clone(),
     };
     sleep(random_delay).await;

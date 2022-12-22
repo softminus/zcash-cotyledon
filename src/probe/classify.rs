@@ -12,9 +12,7 @@ use zebra_network::Version;
 use crate::probe::internal::{PeerDerivedData, REQUIRED_MAINNET_HEIGHT, REQUIRED_TESTNET_HEIGHT};
 use crate::probe::PeerClassification;
 
-#[derive(Debug, Clone)]
-
-
+#[derive(Debug, Clone, Default)]
 pub struct ProbeStat {
     pub attempt_count: u64,
     pub last_polled:  Option<SystemTime>,
@@ -32,7 +30,7 @@ pub fn probe_stat_update(probe_stat: &mut ProbeStat, new_data_point: bool, new_p
     }
 }
 
-
+#[derive(Debug, Clone, Default)]
 pub struct PeerStats {
     pub ewma_pack: EWMAPack,
 
