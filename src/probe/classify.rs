@@ -54,7 +54,7 @@ pub struct ProbeConfiguration {
 }
 
 
-pub fn all_good_test(peer_stats: &Option<PeerStats>, network: Network, probes_config: ProbeConfiguration) -> bool {
+pub fn all_good_test(peer_stats: &Option<PeerStats>, network: Network, probes_config: ProbeConfiguration) -> Option<PeerClassification> {
     if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
         // negotiating the protocol at least once rules out Unknown and BeyondUseless
         // therefore, the node is one of {AllGood, MerelySyncedEnough, EventuallyMaybeSynced, GenericBad}
@@ -77,25 +77,25 @@ pub fn all_good_test(peer_stats: &Option<PeerStats>, network: Network, probes_co
         if probe_stat.total_attempts <= 3
             && probe_stat.valid_block_reply_ok * 2 >= probe_stat.total_attempts
         {
-            return true;
+            return Some(PeerClassification::AllGood);
         }
         if ewmas.stat_2_hours.reliability > 0.85 && ewmas.stat_2_hours.count > 2.0 {
-            return true;
+            return Some(PeerClassification::AllGood);
         }
         if ewmas.stat_8_hours.reliability > 0.70 && ewmas.stat_8_hours.count > 4.0 {
-            return true;
+            return Some(PeerClassification::AllGood);
         }
         if ewmas.stat_1day.reliability > 0.55 && ewmas.stat_1day.count > 8.0 {
-            return true;
+            return Some(PeerClassification::AllGood);
         }
         if ewmas.stat_1week.reliability > 0.45 && ewmas.stat_1week.count > 16.0 {
-            return true;
+            return Some(PeerClassification::AllGood);
         }
         if ewmas.stat_1month.reliability > 0.35 && ewmas.stat_1month.count > 32.0 {
-            return true;
+            return Some(PeerClassification::AllGood);
         }
     }
-    return false;
+    return None;
 }
 
 
@@ -118,26 +118,26 @@ pub fn get_classification(
         return PeerClassification::Unknown;
     }
 
-    if all_good_test(peer_stats, network, probes_config) {
+    if let Some(all_good) = all_good_test(peer_stats, network, probes_config) {
         if check_gating(peer_stats, network, probes_config.all_good_gating_probes) {
-            return PeerClassification::AllGood;
+            return all_good;
         }
     }
 
-    if merely_synced_test(peer_stats, network, probes_config) {
+    if let Some(merely) = merely_synced_test(peer_stats, network, probes_config) {
         if check_gating(peer_stats, network, probes_config.merely_synced_gating_probes) {
-            return PeerClassification::MerelySyncedEnough;
+            return merely;
         }
     }
 
-    if eventually_maybe_test(peer_stats, network, probes_config) {
+    if let Some(maybe) = eventually_maybe_test(peer_stats, network, probes_config) {
         if check_gating(peer_stats, network, probes_config.eventually_maybe_gating_probes) {
-            return PeerClassification::EventuallyMaybeSynced;
+            return maybe;
         }
     }
 
-    if beyond_useless_test(peer_stats, network, probes_config) {
-        return PeerClassification::BeyondUseless;
+    if let Some(beyond_useless) = beyond_useless_test(peer_stats, network, probes_config) {
+        return beyond_useless;
     }
 
     return PeerClassification::GenericBad;
