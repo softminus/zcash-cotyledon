@@ -239,15 +239,15 @@ async fn main() {
                     peers_timeout: Duration::from_secs(8), // make me configurable
                     hash_timeout: Duration::from_secs(8),  // make me configurable
                 };
-                fast_walker(
-                    &serving_nodes_shared,
-                    &mut internal_peer_tracker,
-                    network,
-                    max_inflight_conn.try_into().unwrap(),
-                    timeouts,
-                    16, // make me configurable
-                )
-                .await;
+                // fast_walker(
+                //     &serving_nodes_shared,
+                //     &mut internal_peer_tracker,
+                //     network,
+                //     max_inflight_conn.try_into().unwrap(),
+                //     timeouts,
+                //     16, // make me configurable
+                // )
+                // .await;
                 {
                     let serving_nodes_testing = serving_nodes_shared.read().unwrap();
                     if serving_nodes_testing.primaries.len()
@@ -476,106 +476,106 @@ fn exponential_acquisition_threshold_secs(
 //     }
 // }
 
-async fn fast_walker(
-    serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
-    internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
-    network: Network,
-    max_inflight_conn: usize,
-    timeouts: Timeouts,
-    smear_cap: u64,
-) {
-    let mut handles = FuturesUnordered::new();
-    let doryphore = Arc::new(Semaphore::new(max_inflight_conn));
+// async fn fast_walker(
+//     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+//     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
+//     network: Network,
+//     max_inflight_conn: usize,
+//     timeouts: Timeouts,
+//     smear_cap: u64,
+// ) {
+//     let mut handles = FuturesUnordered::new();
+//     let doryphore = Arc::new(Semaphore::new(max_inflight_conn));
 
-    let mut rng = rand::thread_rng();
-    for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        handles.push(Box::pin(hash_probe_and_update(
-            proband_address.clone(),
-            peer_stat.clone(),
-            network,
-            &timeouts,
-            Duration::from_secs(rng.gen_range(0..smear_cap)),
-            doryphore.clone(),
-        ))
-            as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
-        handles.push(Box::pin(probe_for_peers_two(
-            proband_address.clone(),
-            network,
-            &timeouts,
-            Duration::from_secs(rng.gen_range(0..smear_cap)),
-            doryphore.clone(),
-        )));
-    }
-    while let Some(probe_result) = handles.next().await {
-        let peer_address = probe_result.0;
-        match probe_result.1 {
-            ProbeResult::Result(new_peer_stat) => {
-                println!(
-                    "{:?} has new peer stat, which classifies it as a {:?}: {:?}",
-                    peer_address,
-                    get_classification(&Some(new_peer_stat.clone()), &peer_address, network),
-                    new_peer_stat
-                );
-                internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
-                single_node_update(
-                    &serving_nodes_shared,
-                    &peer_address,
-                    &Some(new_peer_stat.clone()),
-                );
-                println!("HashMap len: {:?}", internal_peer_tracker.len());
-            }
-            ProbeResult::MustRetryProbe => {
-                // we gotta retry
-                println!("Retrying hash probe for {:?}", peer_address);
-                handles.push(Box::pin(hash_probe_and_update(
-                    peer_address.clone(),
-                    internal_peer_tracker[&peer_address].clone(),
-                    network,
-                    &timeouts,
-                    Duration::from_secs(rng.gen_range(0..smear_cap)),
-                    doryphore.clone(),
-                )));
-            }
-            ProbeResult::PeersResult(new_peers) => {
-                for peer in new_peers {
-                    let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
-                    if !internal_peer_tracker.contains_key(&key) {
-                        println!(
-                            "Probing {:?} yielded new peer {:?}, adding to work queue",
-                            peer_address, key
-                        );
-                        internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                        handles.push(Box::pin(hash_probe_and_update(
-                            key.clone(),
-                            <Option<PeerStats>>::None,
-                            network,
-                            &timeouts,
-                            Duration::from_secs(rng.gen_range(0..smear_cap)),
-                            doryphore.clone(),
-                        )));
-                        handles.push(Box::pin(probe_for_peers_two(
-                            key.clone(),
-                            network,
-                            &timeouts,
-                            Duration::from_secs(rng.gen_range(0..smear_cap)),
-                            doryphore.clone(),
-                        )));
-                    }
-                }
-            }
-            ProbeResult::PeersFail => {
-                println!("probing {:?} for peers failed, not retrying", peer_address);
-            }
-            ProbeResult::MustRetryPeers => {
-                println!("Retrying peers probe for {:?}", peer_address);
-                handles.push(Box::pin(probe_for_peers_two(
-                    peer_address.clone(),
-                    network,
-                    &timeouts,
-                    Duration::from_secs(rng.gen_range(0..smear_cap)),
-                    doryphore.clone(),
-                )));
-            }
-        }
-    }
-}
+//     let mut rng = rand::thread_rng();
+//     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
+//         handles.push(Box::pin(hash_probe_and_update(
+//             proband_address.clone(),
+//             peer_stat.clone(),
+//             network,
+//             &timeouts,
+//             Duration::from_secs(rng.gen_range(0..smear_cap)),
+//             doryphore.clone(),
+//         ))
+//             as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
+//         handles.push(Box::pin(probe_for_peers_two(
+//             proband_address.clone(),
+//             network,
+//             &timeouts,
+//             Duration::from_secs(rng.gen_range(0..smear_cap)),
+//             doryphore.clone(),
+//         )));
+//     }
+//     while let Some(probe_result) = handles.next().await {
+//         let peer_address = probe_result.0;
+//         match probe_result.1 {
+//             ProbeResult::Result(new_peer_stat) => {
+//                 println!(
+//                     "{:?} has new peer stat, which classifies it as a {:?}: {:?}",
+//                     peer_address,
+//                     get_classification(&Some(new_peer_stat.clone()), &peer_address, network),
+//                     new_peer_stat
+//                 );
+//                 internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
+//                 single_node_update(
+//                     &serving_nodes_shared,
+//                     &peer_address,
+//                     &Some(new_peer_stat.clone()),
+//                 );
+//                 println!("HashMap len: {:?}", internal_peer_tracker.len());
+//             }
+//             ProbeResult::MustRetryProbe => {
+//                 // we gotta retry
+//                 println!("Retrying hash probe for {:?}", peer_address);
+//                 handles.push(Box::pin(hash_probe_and_update(
+//                     peer_address.clone(),
+//                     internal_peer_tracker[&peer_address].clone(),
+//                     network,
+//                     &timeouts,
+//                     Duration::from_secs(rng.gen_range(0..smear_cap)),
+//                     doryphore.clone(),
+//                 )));
+//             }
+//             ProbeResult::PeersResult(new_peers) => {
+//                 for peer in new_peers {
+//                     let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
+//                     if !internal_peer_tracker.contains_key(&key) {
+//                         println!(
+//                             "Probing {:?} yielded new peer {:?}, adding to work queue",
+//                             peer_address, key
+//                         );
+//                         internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+//                         handles.push(Box::pin(hash_probe_and_update(
+//                             key.clone(),
+//                             <Option<PeerStats>>::None,
+//                             network,
+//                             &timeouts,
+//                             Duration::from_secs(rng.gen_range(0..smear_cap)),
+//                             doryphore.clone(),
+//                         )));
+//                         handles.push(Box::pin(probe_for_peers_two(
+//                             key.clone(),
+//                             network,
+//                             &timeouts,
+//                             Duration::from_secs(rng.gen_range(0..smear_cap)),
+//                             doryphore.clone(),
+//                         )));
+//                     }
+//                 }
+//             }
+//             ProbeResult::PeersFail => {
+//                 println!("probing {:?} for peers failed, not retrying", peer_address);
+//             }
+//             ProbeResult::MustRetryPeers => {
+//                 println!("Retrying peers probe for {:?}", peer_address);
+//                 handles.push(Box::pin(probe_for_peers_two(
+//                     peer_address.clone(),
+//                     network,
+//                     &timeouts,
+//                     Duration::from_secs(rng.gen_range(0..smear_cap)),
+//                     doryphore.clone(),
+//                 )));
+//             }
+//         }
+//     }
+// }
