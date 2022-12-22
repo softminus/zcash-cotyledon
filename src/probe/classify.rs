@@ -34,21 +34,21 @@ pub struct ProbeStat {
     pub last_success: Option<SystemTime>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum AugmentedProbeTypes {
-    Block,
-    Headers,
-    Negotiation,
-    NumericVersion,
-    UserAgent,
+#[derive(Debug, Clone)]
+pub enum GatingProbes {
+    Block(Duration),
+    Headers(Duration),
+    Negotiation(Duration),
+    NumericVersion(Vec<String>),
+    UserAgent(Vec<String>),
     PeerHeight,
 }
 
 pub struct ProbeConfiguration {
     ewma_probe: ProbeType,
-    all_good_gating_probes: Vec<AugmentedProbeTypes>,
-    merely_synced_gating_probes: Vec<AugmentedProbeTypes>,
-    eventually_maybe_gating_probes: Vec<AugmentedProbeTypes>,
+    all_good_gating_probes: Vec<GatingProbes>,
+    merely_synced_gating_probes: Vec<GatingProbes>,
+    eventually_maybe_gating_probes: Vec<GatingProbes>,
     merely_synced_timeout: Duration,
     eventually_synced_timeout: Duration,
     beyond_useless_count_threshold: u64,
@@ -210,26 +210,26 @@ fn check_gating(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-    gating_probes: &Vec<AugmentedProbeTypes>,
+    gating_probes: &Vec<GatingProbes>,
 ) -> PeerClassification {
     for probe in gating_probes {
         if !match probe {
-            AugmentedProbeTypes::Block => {
-                gating_check_block(peer_stats, candidate_classification, network)
+            GatingProbes::Block(timeout) => {
+                gating_check_block(peer_stats, candidate_classification, network, timeout)
             }
-            AugmentedProbeTypes::Headers => {
-                gating_check_headers(peer_stats, candidate_classification, network)
+            GatingProbes::Headers(timeout) => {
+                gating_check_headers(peer_stats, candidate_classification, network, timeout)
             }
-            AugmentedProbeTypes::Negotiation => {
-                gating_check_negotiation(peer_stats, candidate_classification, network)
+            GatingProbes::Negotiation(timeout) => {
+                gating_check_negotiation(peer_stats, candidate_classification, network, timeout)
             }
-            AugmentedProbeTypes::NumericVersion => {
-                gating_check_numeric_version(peer_stats, candidate_classification, network)
+            GatingProbes::NumericVersion(valid_versions) => {
+                gating_check_numeric_version(peer_stats, candidate_classification, network, valid_versions)
             }
-            AugmentedProbeTypes::UserAgent => {
-                gating_check_user_agent(peer_stats, candidate_classification, network)
+            GatingProbes::UserAgent(valid_user_agents) => {
+                gating_check_user_agent(peer_stats, candidate_classification, network, valid_user_agents)
             }
-            AugmentedProbeTypes::PeerHeight => {
+            GatingProbes::PeerHeight => {
                 gating_check_peer_height(peer_stats, candidate_classification, network)
             }
         } {
@@ -243,6 +243,7 @@ fn gating_check_block(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
+    timeout: &Duration,
 ) -> bool {
     todo!();
 }
@@ -251,6 +252,7 @@ fn gating_check_headers(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
+    timeout: &Duration,
 ) -> bool {
     todo!();
 }
@@ -259,6 +261,7 @@ fn gating_check_negotiation(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
+    timeout: &Duration,
 ) -> bool {
     todo!();
 }
@@ -267,6 +270,7 @@ fn gating_check_numeric_version(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
+    valid_versions: &Vec<String>,
 ) -> bool {
     todo!();
 }
@@ -275,6 +279,7 @@ fn gating_check_user_agent(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
+    valid_user_agents: &Vec<String>,
 ) -> bool {
     todo!();
 }
