@@ -20,7 +20,7 @@ use zebra_network::{
 };
 
 use crate::probe::{ProbeResult, Timeouts};
-use crate::probe::internal::{ErrorFlavor, classify_zebra_network_errors, PeerDerivedData};
+use crate::probe::common::{ErrorFlavor, classify_zebra_network_errors, PeerDerivedData};
 
 #[derive(Debug, Clone)]
 pub enum NegotiationProbeResult {

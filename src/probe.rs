@@ -1,6 +1,6 @@
 pub mod classify;
 pub mod ewma;
-pub mod internal;
+pub mod common;
 pub mod headers;
 pub mod block;
 pub mod protocol;

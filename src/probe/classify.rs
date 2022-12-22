@@ -9,7 +9,7 @@ use zebra_chain::parameters::Network;
 use zebra_network::types::PeerServices;
 use zebra_network::Version;
 
-use crate::probe::internal::{PeerDerivedData, REQUIRED_MAINNET_HEIGHT, REQUIRED_TESTNET_HEIGHT};
+use crate::probe::common::{PeerDerivedData, REQUIRED_MAINNET_HEIGHT, REQUIRED_TESTNET_HEIGHT};
 use crate::probe::PeerClassification;
 use super::ewma::EWMAPack;
 
