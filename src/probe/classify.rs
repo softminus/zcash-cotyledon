@@ -141,6 +141,9 @@ pub fn get_classification(
         return beyond_useless;
     }
 
+    if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        println!("WARNING: classifying node {:?} with PeerStats {:?} as GenericBad despite having negotiated wire protocol: {:?}", peer_address, peer_stats, peer_derived_data);
+    }
     return PeerClassification::GenericBad;
 }
 
