@@ -209,12 +209,12 @@ fn check_gating(
 ) -> PeerClassification {
     for probe in gating_probes {
         if !match probe {
-            AugmentedProbeTypes::Block => {false},
-            AugmentedProbeTypes::Headers => {false},
-            AugmentedProbeTypes::Negotiation => {false},
-            AugmentedProbeTypes::NumericVersion =>{false},
-            AugmentedProbeTypes::UserAgent =>{false},
-            AugmentedProbeTypes::PeerHeight =>{false},
+            AugmentedProbeTypes::Block => {gating_check_block(peer_stats, candidate_classification, network)},
+            AugmentedProbeTypes::Headers => {gating_check_headers(peer_stats, candidate_classification, network)},
+            AugmentedProbeTypes::Negotiation => {gating_check_negotiation(peer_stats, candidate_classification, network)},
+            AugmentedProbeTypes::NumericVersion =>{gating_check_numeric_version(peer_stats, candidate_classification, network)},
+            AugmentedProbeTypes::UserAgent =>{gating_check_user_agent(peer_stats, candidate_classification, network)},
+            AugmentedProbeTypes::PeerHeight =>{gating_check_peer_height(peer_stats, candidate_classification, network)},
             }
             {
                 return PeerClassification::GenericBad;
@@ -228,7 +228,6 @@ fn gating_check_block(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-    gating_probes: &Vec<AugmentedProbeTypes>,
 ) -> bool
 {
     todo!();
@@ -238,7 +237,6 @@ fn gating_check_headers(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-    gating_probes: &Vec<AugmentedProbeTypes>,
 ) -> bool
 {
     todo!();
@@ -248,7 +246,6 @@ fn gating_check_negotiation(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-    gating_probes: &Vec<AugmentedProbeTypes>,
 ) -> bool
 {
     todo!();
@@ -258,7 +255,6 @@ fn gating_check_numeric_version(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-    gating_probes: &Vec<AugmentedProbeTypes>,
 ) -> bool
 {
     todo!();
@@ -268,7 +264,6 @@ fn gating_check_user_agent(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-    gating_probes: &Vec<AugmentedProbeTypes>,
 ) -> bool
 {
     todo!();
@@ -278,7 +273,6 @@ fn gating_check_peer_height(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-    gating_probes: &Vec<AugmentedProbeTypes>,
 ) -> bool
 {
     todo!();
