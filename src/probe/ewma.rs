@@ -16,19 +16,19 @@ use crate::probe::classify::ProbeStat;
 
 #[derive(Debug, Clone, Copy)]
 pub struct EWMAPack {
-    stat_2_hours: EWMAState,
-    stat_8_hours: EWMAState,
-    stat_1day: EWMAState,
-    stat_1week: EWMAState,
-    stat_1month: EWMAState,
+    pub stat_2_hours: EWMAState,
+    pub stat_8_hours: EWMAState,
+    pub stat_1day: EWMAState,
+    pub stat_1week: EWMAState,
+    pub stat_1month: EWMAState,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct EWMAState {
-    scale: Duration,
-    weight: f64,
-    count: f64,
-    reliability: f64,
+    pub scale: Duration,
+    pub weight: f64,
+    pub count: f64,
+    pub reliability: f64,
 }
 
 
