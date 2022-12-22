@@ -23,7 +23,7 @@ pub struct ProbeStat {
     pub last_success: Option<SystemTime>,
 }
 
-pub fn probe_stat_update(&mut ProbeStat: probe_stat, bool: new_data_point, SystemTime: new_poll_time) {
+pub fn probe_stat_update(probe_stat: &mut ProbeStat, new_data_point: bool, new_poll_time: SystemTime) {
     probe_stat.attempt_count += 1;
     probe_stat.last_polled   = Some(new_poll_time);
     if new_data_point {
