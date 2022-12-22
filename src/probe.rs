@@ -1,4 +1,5 @@
 pub mod classify;
+pub mod ewma;
 pub mod internal;
 pub mod headers;
 pub mod block;
@@ -14,7 +15,8 @@ use tokio::time::sleep;
 use zebra_chain::parameters::Network;
 use zebra_network::types::MetaAddr;
 
-use crate::probe::classify::{update_ewma_pack, EWMAPack, PeerStats, probe_stat_update};
+use crate::probe::classify::PeerStats;
+use crate::probe::ewma::{update_ewma_pack, EWMAPack, probe_stat_update};
 use crate::probe::{block::block_probe_inner, headers::headers_probe_inner, protocol::negotiation_probe_inner};
 use crate::probe::{headers::HeadersProbeResult, block::BlockProbeResult, protocol::NegotiationProbeResult};
 
