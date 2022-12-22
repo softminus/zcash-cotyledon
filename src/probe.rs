@@ -1,5 +1,8 @@
 pub mod classify;
 pub mod internal;
+pub mod headers;
+pub mod block;
+pub mod protocol;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
