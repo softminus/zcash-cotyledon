@@ -100,7 +100,7 @@ fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.block_probe.last_polled,
                 current_poll_time,
                 false,
             );
@@ -113,7 +113,7 @@ fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.block_probe.last_polled,
                 current_poll_time,
                 false,
             );
@@ -126,7 +126,7 @@ fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.block_probe.last_polled,
                 current_poll_time,
                 false,
             );
@@ -140,7 +140,7 @@ fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.block_probe.last_polled,
                 current_poll_time,
                 true,
             );
@@ -166,7 +166,7 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.header_probe.last_polled,
                 current_poll_time,
                 false,
             );
@@ -179,7 +179,7 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.header_probe.last_polled,
                 current_poll_time,
                 false,
             );
@@ -192,7 +192,7 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.header_probe.last_polled,
                 current_poll_time,
                 false,
             );
@@ -206,7 +206,7 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.header_probe.last_polled,
                 current_poll_time,
                 true,
             );
@@ -230,7 +230,7 @@ fn negotiation_probe_update(probe_res: NegotiationProbeResult, current_poll_time
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.protocol_negotiation.last_polled,
                 current_poll_time,
                 false,
             );
@@ -242,7 +242,7 @@ fn negotiation_probe_update(probe_res: NegotiationProbeResult, current_poll_time
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.protocol_negotiation.last_polled,
                 current_poll_time,
                 false,
             );
@@ -255,7 +255,7 @@ fn negotiation_probe_update(probe_res: NegotiationProbeResult, current_poll_time
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
-                new_peer_stats.last_polled,
+                new_peer_stats.protocol_negotiation.last_polled,
                 current_poll_time,
                 true,
             );
