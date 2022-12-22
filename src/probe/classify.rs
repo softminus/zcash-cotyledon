@@ -17,20 +17,28 @@ use crate::probe::PeerClassification;
 
 pub struct ProbeStat {
     pub attempt_count: u64,
+    pub last_polled:  Option<SystemTime>,
+
     pub success_count: u64,
     pub last_success: Option<SystemTime>,
-    pub last_polled:  Option<SystemTime>
 }
+
+pub fn probe_stat_update(&mut ProbeStat: probe_stat, bool: new_data_point, SystemTime: new_poll_time) {
+    probe_stat.attempt_count += 1;
+    probe_stat.last_polled   = Some(new_poll_time);
+    if new_data_point {
+        probe_stat.success_count += 1;
+        probe_stat.last_success = Some(new_poll_time);
+    }
+}
+
 
 pub struct PeerStats {
     pub ewma_pack: EWMAPack,
 
     pub tcp_connection: ProbeStat,
-
     pub protocol_negotiation: ProbeStat,
-
     pub block_probe: ProbeStat,
-
     pub header_probe: ProbeStat,
 
     pub peer_derived_data: Option<PeerDerivedData>,

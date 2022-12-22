@@ -96,14 +96,14 @@ async fn probe_and_update(
 fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime, new_peer_stats: &mut PeerStats) -> ProbeResult {
     match probe_res {
         BlockProbeResult::MustRetry => {
+            // no updating any stats, the probe was invalid
             println!("Retry the connection!");
             return ProbeResult::MustRetryProbe;
         }
         BlockProbeResult::TCPFailure => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 0;
-            new_peer_stats.protocol_negotiations_ok += 0;
-            new_peer_stats.valid_block_reply_ok += 0;
+            probe_stat_update(new_peer_stats.tcp_connection,       false, current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, false, current_poll_time);
+            probe_stat_update(new_peer_stats.block_probe,          false, current_poll_time);
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -111,14 +111,12 @@ fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime
                 current_poll_time,
                 false,
             );
-            new_peer_stats.last_polled = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
         BlockProbeResult::ProtocolBad => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 1;
-            new_peer_stats.protocol_negotiations_ok += 0;
-            new_peer_stats.valid_block_reply_ok += 0;
+            probe_stat_update(new_peer_stats.tcp_connection,       true,  current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, false, current_poll_time);
+            probe_stat_update(new_peer_stats.block_probe,          false, current_poll_time);
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -126,16 +124,12 @@ fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime
                 current_poll_time,
                 false,
             );
-            new_peer_stats.last_polled = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
         BlockProbeResult::BlockRequestFail(new_peer_data) => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 1;
-            new_peer_stats.protocol_negotiations_ok += 1;
-            new_peer_stats.valid_block_reply_ok += 0;
-
-            new_peer_stats.peer_derived_data = Some(new_peer_data);
+            probe_stat_update(new_peer_stats.tcp_connection,       true,  current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, true,  current_poll_time);
+            probe_stat_update(new_peer_stats.block_probe,          false, current_poll_time);
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -143,15 +137,14 @@ fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime
                 current_poll_time,
                 false,
             );
-            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
-            new_peer_stats.last_polled = Some(current_poll_time);
+            new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
         }
         BlockProbeResult::BlockRequestOK(new_peer_data) => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 1;
-            new_peer_stats.protocol_negotiations_ok += 1;
-            new_peer_stats.valid_block_reply_ok += 1;
+            probe_stat_update(new_peer_stats.tcp_connection,       true, current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, true, current_poll_time);
+            probe_stat_update(new_peer_stats.block_probe,          true, current_poll_time);
+
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             update_ewma_pack(
@@ -160,9 +153,6 @@ fn block_probe_update(probe_res: BlockProbeResult, current_poll_time: SystemTime
                 current_poll_time,
                 true,
             );
-            new_peer_stats.last_polled = Some(current_poll_time);
-            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
-            new_peer_stats.last_block_success = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
     }
@@ -178,10 +168,10 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
             return ProbeResult::MustRetryProbe;
         }
         HeadersProbeResult::TCPFailure => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 0;
-            new_peer_stats.protocol_negotiations_ok += 0;
-            new_peer_stats.valid_block_reply_ok += 0;
+            probe_stat_update(new_peer_stats.tcp_connection,       false, current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, false, current_poll_time);
+            probe_stat_update(new_peer_stats.header_probe,         false, current_poll_time);
+
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -189,14 +179,13 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
                 current_poll_time,
                 false,
             );
-            new_peer_stats.last_polled = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
         HeadersProbeResult::ProtocolBad => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 1;
-            new_peer_stats.protocol_negotiations_ok += 0;
-            new_peer_stats.valid_block_reply_ok += 0;
+            probe_stat_update(new_peer_stats.tcp_connection,       true,  current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, false, current_poll_time);
+            probe_stat_update(new_peer_stats.header_probe,         false, current_poll_time);
+
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -204,14 +193,12 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
                 current_poll_time,
                 false,
             );
-            new_peer_stats.last_polled = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
         HeadersProbeResult::HeadersFail(new_peer_data) => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 1;
-            new_peer_stats.protocol_negotiations_ok += 1;
-            new_peer_stats.valid_block_reply_ok += 0;
+            probe_stat_update(new_peer_stats.tcp_connection,       true, current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, true, current_poll_time);
+            probe_stat_update(new_peer_stats.header_probe,         false, current_poll_time);
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
 
@@ -221,15 +208,13 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
                 current_poll_time,
                 false,
             );
-            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
-            new_peer_stats.last_polled = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
         HeadersProbeResult::HeadersOK(new_peer_data) => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 1;
-            new_peer_stats.protocol_negotiations_ok += 1;
-            new_peer_stats.valid_block_reply_ok += 1;
+            probe_stat_update(new_peer_stats.tcp_connection,       true, current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, true, current_poll_time);
+            probe_stat_update(new_peer_stats.header_probe,         true, current_poll_time);
+
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             update_ewma_pack(
@@ -238,9 +223,6 @@ fn headers_probe_update(probe_res: HeadersProbeResult, current_poll_time: System
                 current_poll_time,
                 true,
             );
-            new_peer_stats.last_polled = Some(current_poll_time);
-            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
-            new_peer_stats.last_block_success = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
     }
@@ -255,10 +237,8 @@ fn negotiation_probe_update(probe_res: NegotiationProbeResult, current_poll_time
             return ProbeResult::MustRetryProbe;
         }
         NegotiationProbeResult::TCPFailure => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 0;
-            new_peer_stats.protocol_negotiations_ok += 0;
-            new_peer_stats.valid_block_reply_ok += 0;
+            probe_stat_update(new_peer_stats.tcp_connection,       false, current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, false, current_poll_time);
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -266,14 +246,12 @@ fn negotiation_probe_update(probe_res: NegotiationProbeResult, current_poll_time
                 current_poll_time,
                 false,
             );
-            new_peer_stats.last_polled = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
         NegotiationProbeResult::ProtocolBad => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 1;
-            new_peer_stats.protocol_negotiations_ok += 0;
-            new_peer_stats.valid_block_reply_ok += 0;
+            probe_stat_update(new_peer_stats.tcp_connection,       true, current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, false, current_poll_time);
+
 
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
@@ -281,14 +259,12 @@ fn negotiation_probe_update(probe_res: NegotiationProbeResult, current_poll_time
                 current_poll_time,
                 false,
             );
-            new_peer_stats.last_polled = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
         NegotiationProbeResult::ProtocolOK(new_peer_data) => {
-            new_peer_stats.total_attempts += 1;
-            new_peer_stats.tcp_connections_ok += 1;
-            new_peer_stats.protocol_negotiations_ok += 1;
-            new_peer_stats.valid_block_reply_ok += 1;
+            probe_stat_update(new_peer_stats.tcp_connection,       true, current_poll_time);
+            probe_stat_update(new_peer_stats.protocol_negotiation, true, current_poll_time);
+
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             update_ewma_pack(
@@ -297,9 +273,6 @@ fn negotiation_probe_update(probe_res: NegotiationProbeResult, current_poll_time
                 current_poll_time,
                 true,
             );
-            new_peer_stats.last_polled = Some(current_poll_time);
-            new_peer_stats.last_protocol_negotiation = Some(current_poll_time);
-            new_peer_stats.last_block_success = Some(current_poll_time);
             return ProbeResult::Result(new_peer_stats.clone());
         }
     }
