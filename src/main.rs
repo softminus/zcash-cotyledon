@@ -234,7 +234,8 @@ async fn main() {
     loop {
         println!("starting Loop");
         match mode {
-            CrawlingMode::FastAcquisition => {
+            _ => {
+            // CrawlingMode::FastAcquisition => {
                 let timeouts = Timeouts {
                     peers_timeout: Duration::from_secs(8), // make me configurable
                     hash_timeout: Duration::from_secs(8),  // make me configurable
@@ -260,27 +261,27 @@ async fn main() {
                             serving_nodes_testing.primaries.len()
                                 + serving_nodes_testing.alternates.len()
                         );
-                        mode = CrawlingMode::LongTermUpdates;
+//                        mode = CrawlingMode::LongTermUpdates;
                     }
                 }
                 println!("FAST WALKER iteration done");
                 sleep(Duration::new(8, 0)).await;
             }
-            CrawlingMode::LongTermUpdates => {
-                let timeouts = Timeouts {
-                    peers_timeout: Duration::from_secs(32), // make me configurable
-                    hash_timeout: Duration::from_secs(32),  // make me configurable
-                };
-                slow_walker(
-                    &serving_nodes_shared,
-                    &mut internal_peer_tracker,
-                    network,
-                    max_inflight_conn.try_into().unwrap(),
-                    timeouts,
-                    128, // make me configurable
-                )
-                .await;
-            }
+            // CrawlingMode::LongTermUpdates => {
+            //     let timeouts = Timeouts {
+            //         peers_timeout: Duration::from_secs(32), // make me configurable
+            //         hash_timeout: Duration::from_secs(32),  // make me configurable
+            //     };
+            //     slow_walker(
+            //         &serving_nodes_shared,
+            //         &mut internal_peer_tracker,
+            //         network,
+            //         max_inflight_conn.try_into().unwrap(),
+            //         timeouts,
+            //         128, // make me configurable
+            //     )
+            //     .await;
+            // }
         }
         // just in case...we could add code to check if this does anything to find bugs with the incremental update
         update_serving_nodes(&serving_nodes_shared, &internal_peer_tracker);
@@ -394,87 +395,87 @@ fn exponential_acquisition_threshold_secs(
     }
 }
 
-async fn slow_walker(
-    serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
-    internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
-    network: Network,
-    max_inflight_conn: usize,
-    timeouts: Timeouts,
-    smear_cap: u64,
-) {
-    let mut rng = rand::thread_rng();
-    let mut batch_queries = Vec::new();
-    let doryphore = Arc::new(Semaphore::new(max_inflight_conn));
-    for (proband_address, peer_stat) in internal_peer_tracker.iter() {
-        if poll_this_time_around(peer_stat, proband_address, network) {
-            batch_queries.push(Box::pin(hash_probe_and_update(
-                proband_address.clone(),
-                peer_stat.clone(),
-                network,
-                &timeouts,
-                Duration::from_secs(rng.gen_range(0..smear_cap)),
-                doryphore.clone(),
-            ))
-                as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
-            batch_queries.push(Box::pin(probe_for_peers_two(
-                proband_address.clone(),
-                network,
-                &timeouts,
-                Duration::from_secs(rng.gen_range(0..smear_cap)),
-                doryphore.clone(),
-            )))
-        } else {
-            println!(
-                "NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY",
-                proband_address
-            );
-        }
-    }
+// async fn slow_walker(
+//     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
+//     internal_peer_tracker: &mut HashMap<SocketAddr, Option<PeerStats>>,
+//     network: Network,
+//     max_inflight_conn: usize,
+//     timeouts: Timeouts,
+//     smear_cap: u64,
+// ) {
+//     let mut rng = rand::thread_rng();
+//     let mut batch_queries = Vec::new();
+//     let doryphore = Arc::new(Semaphore::new(max_inflight_conn));
+//     for (proband_address, peer_stat) in internal_peer_tracker.iter() {
+//         if poll_this_time_around(peer_stat, proband_address, network) {
+//             batch_queries.push(Box::pin(hash_probe_and_update(
+//                 proband_address.clone(),
+//                 peer_stat.clone(),
+//                 network,
+//                 &timeouts,
+//                 Duration::from_secs(rng.gen_range(0..smear_cap)),
+//                 doryphore.clone(),
+//             ))
+//                 as Pin<Box<dyn Future<Output = (SocketAddr, ProbeResult)>>>);
+//             batch_queries.push(Box::pin(probe_for_peers_two(
+//                 proband_address.clone(),
+//                 network,
+//                 &timeouts,
+//                 Duration::from_secs(rng.gen_range(0..smear_cap)),
+//                 doryphore.clone(),
+//             )))
+//         } else {
+//             println!(
+//                 "NOT POLLING {:?} THIS TIME AROUND, WE POLLED TOO RECENTLY",
+//                 proband_address
+//             );
+//         }
+//     }
 
-    let mut stream = futures::stream::iter(batch_queries).buffer_unordered(max_inflight_conn);
-    while let Some(probe_result) = stream.next().await {
-        let peer_address = probe_result.0;
+//     let mut stream = futures::stream::iter(batch_queries).buffer_unordered(max_inflight_conn);
+//     while let Some(probe_result) = stream.next().await {
+//         let peer_address = probe_result.0;
 
-        match probe_result.1 {
-            ProbeResult::Result(new_peer_stat) => {
-                println!(
-                    "{:?} has new peer stat, which classifies it as a {:?}: {:?}",
-                    peer_address,
-                    get_classification(&Some(new_peer_stat.clone()), &peer_address, network),
-                    new_peer_stat
-                );
-                internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
-                single_node_update(
-                    &serving_nodes_shared,
-                    &peer_address,
-                    &Some(new_peer_stat.clone()),
-                );
-                println!("HashMap len: {:?}", internal_peer_tracker.len());
-            }
-            ProbeResult::MustRetryProbe => {
-                println!("Slow Walker probing {:?} for hashes failed due to too many open sockets, this should NOT HAPPEN", peer_address);
-            }
-            ProbeResult::PeersResult(new_peers) => {
-                for peer in new_peers {
-                    let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
-                    if !internal_peer_tracker.contains_key(&key) {
-                        println!("Slow Walker Probing {:?} yielded new peer {:?}, adding to peer tracker", peer_address, key);
-                        internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
-                    }
-                }
-            }
-            ProbeResult::PeersFail => {
-                println!(
-                    "Slow Walker probing {:?} for peers failed, will be retried next time around",
-                    peer_address
-                );
-            }
-            ProbeResult::MustRetryPeers => {
-                println!("Slow Walker probing {:?} for peers failed due to too many open sockets, this should NOT HAPPEN", peer_address);
-            }
-        }
-    }
-}
+//         match probe_result.1 {
+//             ProbeResult::Result(new_peer_stat) => {
+//                 println!(
+//                     "{:?} has new peer stat, which classifies it as a {:?}: {:?}",
+//                     peer_address,
+//                     get_classification(&Some(new_peer_stat.clone()), &peer_address, network),
+//                     new_peer_stat
+//                 );
+//                 internal_peer_tracker.insert(peer_address.clone(), Some(new_peer_stat.clone()));
+//                 single_node_update(
+//                     &serving_nodes_shared,
+//                     &peer_address,
+//                     &Some(new_peer_stat.clone()),
+//                 );
+//                 println!("HashMap len: {:?}", internal_peer_tracker.len());
+//             }
+//             ProbeResult::MustRetryProbe => {
+//                 println!("Slow Walker probing {:?} for hashes failed due to too many open sockets, this should NOT HAPPEN", peer_address);
+//             }
+//             ProbeResult::PeersResult(new_peers) => {
+//                 for peer in new_peers {
+//                     let key = peer.addr().to_socket_addrs().unwrap().next().unwrap();
+//                     if !internal_peer_tracker.contains_key(&key) {
+//                         println!("Slow Walker Probing {:?} yielded new peer {:?}, adding to peer tracker", peer_address, key);
+//                         internal_peer_tracker.insert(key.clone(), <Option<PeerStats>>::None);
+//                     }
+//                 }
+//             }
+//             ProbeResult::PeersFail => {
+//                 println!(
+//                     "Slow Walker probing {:?} for peers failed, will be retried next time around",
+//                     peer_address
+//                 );
+//             }
+//             ProbeResult::MustRetryPeers => {
+//                 println!("Slow Walker probing {:?} for peers failed due to too many open sockets, this should NOT HAPPEN", peer_address);
+//             }
+//         }
+//     }
+// }
 
 async fn fast_walker(
     serving_nodes_shared: &Arc<RwLock<ServingNodes>>,
