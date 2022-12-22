@@ -56,7 +56,7 @@ pub struct ProbeConfiguration {
 }
 
 
-pub fn all_good_test(peer_stats: &Option<PeerStats>, network: Network, probes_config: ProbeConfiguration) -> Option<PeerClassification> {
+pub fn all_good_test(peer_stats: &PeerStats, network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
     if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
         // negotiating the protocol at least once rules out Unknown and BeyondUseless
         // therefore, the node is one of {AllGood, MerelySyncedEnough, EventuallyMaybeSynced, GenericBad}
