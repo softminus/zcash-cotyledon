@@ -40,13 +40,13 @@ pub enum BlockProbeResult {
 }
 
 
-pub(super) async fn hash_probe_inner(
+pub(super) async fn block_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
     connection_timeout: Duration,
 ) -> BlockProbeResult {
     println!(
-        "Starting new hash probe connection: peer addr is {:?}",
+        "Starting new block probe connection: peer addr is {:?}",
         peer_addr
     );
     let connection = connect_isolated_tcp_direct(
@@ -65,7 +65,7 @@ pub(super) async fn hash_probe_inner(
     match connection {
         Err(timeout_error) => {
             println!(
-                "Hash test connection with {:?} failed due to user-defined timeout of {:?}: {:?}",
+                "Block test connection with {:?} failed due to user-defined timeout of {:?}: {:?}",
                 peer_addr, connection_timeout, timeout_error
             );
             BlockProbeResult::TCPFailure // this counts as network brokenness, should not count as BeyondUseless, just regular Bad
@@ -78,21 +78,21 @@ pub(super) async fn hash_probe_inner(
                     match error_classification {
                         ErrorFlavor::Ephemeral(msg) => {
                             println!(
-                                "Hash test connection with {:?} got an ephemeral error: {:?}",
+                                "Block test connection with {:?} got an ephemeral error: {:?}",
                                 peer_addr, msg
                             );
                             BlockProbeResult::MustRetry
                         }
                         ErrorFlavor::Network(msg) => {
                             println!(
-                                "Hash test connection with {:?} got an network error: {:?}",
+                                "Block test connection with {:?} got an network error: {:?}",
                                 peer_addr, msg
                             );
                             BlockProbeResult::TCPFailure
                         }
                         ErrorFlavor::Protocol(msg) => {
                             println!(
-                                "Hash test connection with {:?} got an protocol error: {:?}",
+                                "Block test connection with {:?} got an protocol error: {:?}",
                                 peer_addr, msg
                             );
                             BlockProbeResult::ProtocolBad
