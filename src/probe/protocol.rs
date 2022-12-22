@@ -1,26 +1,14 @@
-
 use std::net::SocketAddr;
 
 use std::time::Duration;
 
-
-
-
-
-
-use tokio::time::{timeout};
-
+use tokio::time::timeout;
 
 use zebra_chain::parameters::Network;
 
+use zebra_network::connect_isolated_tcp_direct;
 
-
-use zebra_network::{
-    connect_isolated_tcp_direct,
-};
-
-
-use crate::probe::common::{ErrorFlavor, classify_zebra_network_errors, PeerDerivedData};
+use crate::probe::common::{classify_zebra_network_errors, ErrorFlavor, PeerDerivedData};
 
 #[derive(Debug, Clone)]
 pub enum NegotiationProbeResult {
@@ -36,9 +24,6 @@ pub enum NegotiationProbeResult {
     // Protocol negotiation went OK
     ProtocolOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok
 }
-
-
-
 
 pub(super) async fn negotiation_probe_inner(
     peer_addr: SocketAddr,
@@ -116,6 +101,3 @@ pub(super) async fn negotiation_probe_inner(
         }
     }
 }
-
-
-

@@ -9,11 +9,7 @@ use std::collections::HashMap;
 use std::net::{SocketAddr, ToSocketAddrs};
 
 use std::sync::{Arc, RwLock};
-use std::time::{Duration};
-
-
-
-
+use std::time::Duration;
 
 use futures_util::StreamExt;
 
@@ -26,13 +22,13 @@ use tonic::transport::Server;
 
 use zebra_chain::parameters::Network;
 
-use crate::probe::classify::{PeerStats};
-use crate::probe::{Timeouts};
+use crate::probe::classify::PeerStats;
+use crate::probe::Timeouts;
 
 use crate::serving::dns::DnsContext;
 use crate::serving::grpc::grpc_protocol::seeder_server::SeederServer;
 use crate::serving::grpc::SeedContext;
-use crate::serving::{ServingNodes};
+use crate::serving::ServingNodes;
 
 enum CrawlingMode {
     FastAcquisition,

@@ -7,22 +7,16 @@ use futures_util::StreamExt;
 
 use tower::Service;
 
-
-use tokio::time::{timeout};
-
+use tokio::time::timeout;
 
 use zebra_chain::parameters::Network;
 
+use zebra_network::{connect_isolated_tcp_direct, InventoryResponse, Request, Response};
 
-
-use zebra_network::{
-    connect_isolated_tcp_direct, InventoryResponse, Request, Response,
+use crate::probe::common::{
+    classify_zebra_network_errors, ErrorFlavor, PeerDerivedData, HASH_CHECKPOINTS_MAINNET,
+    HASH_CHECKPOINTS_TESTNET,
 };
-
-
-use crate::probe::common::{ErrorFlavor, classify_zebra_network_errors, PeerDerivedData};
-use crate::probe::common::{HASH_CHECKPOINTS_MAINNET, HASH_CHECKPOINTS_TESTNET};
-
 
 #[derive(Debug, Clone)]
 pub enum BlockProbeResult {
@@ -41,7 +35,6 @@ pub enum BlockProbeResult {
     // Nominal reply to the block request
     BlockRequestOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok and valid_block_reply_ok
 }
-
 
 pub(super) async fn block_probe_inner(
     peer_addr: SocketAddr,
@@ -166,4 +159,3 @@ pub(super) async fn block_probe_inner(
         }
     }
 }
-

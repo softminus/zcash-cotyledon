@@ -9,9 +9,9 @@ use zebra_chain::parameters::Network;
 use zebra_network::types::PeerServices;
 use zebra_network::Version;
 
+use super::ewma::EWMAPack;
 use crate::probe::common::{PeerDerivedData, REQUIRED_MAINNET_HEIGHT, REQUIRED_TESTNET_HEIGHT};
 use crate::probe::{PeerClassification, ProbeType};
-use super::ewma::EWMAPack;
 
 #[derive(Debug, Clone, Default)]
 pub struct PeerStats {
@@ -25,16 +25,14 @@ pub struct PeerStats {
     pub peer_derived_data: Option<PeerDerivedData>,
 }
 
-
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ProbeStat {
     pub attempt_count: u64,
-    pub last_polled:  Option<SystemTime>,
+    pub last_polled: Option<SystemTime>,
 
     pub success_count: u64,
     pub last_success: Option<SystemTime>,
 }
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum AugmentedProbeTypes {
@@ -43,7 +41,7 @@ pub enum AugmentedProbeTypes {
     Negotiation,
     NumericVersion,
     UserAgent,
-    PeerHeight
+    PeerHeight,
 }
 
 pub struct ProbeConfiguration {
@@ -56,8 +54,11 @@ pub struct ProbeConfiguration {
     beyond_useless_count_threshold: u64,
 }
 
-
-pub fn all_good_test(peer_stats: &PeerStats, _network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
+pub fn all_good_test(
+    peer_stats: &PeerStats,
+    _network: Network,
+    probes_config: &ProbeConfiguration,
+) -> Option<PeerClassification> {
     if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
         // negotiating the protocol at least once rules out Unknown and BeyondUseless
         // therefore, the node is one of {AllGood, MerelySyncedEnough, EventuallyMaybeSynced, GenericBad}
@@ -72,12 +73,11 @@ pub fn all_good_test(peer_stats: &PeerStats, _network: Network, probes_config: &
         let ewmas = peer_stats.ewma_pack;
 
         let probe_stat = match probes_config.ewma_probe {
-            ProbeType::Block =>       peer_stats.block_probe,
-            ProbeType::Headers =>     peer_stats.header_probe,
+            ProbeType::Block => peer_stats.block_probe,
+            ProbeType::Headers => peer_stats.header_probe,
             ProbeType::Negotiation => peer_stats.protocol_negotiation,
         };
-        if probe_stat.attempt_count <= 3
-            && probe_stat.success_count * 2 >= probe_stat.attempt_count
+        if probe_stat.attempt_count <= 3 && probe_stat.success_count * 2 >= probe_stat.attempt_count
         {
             return Some(PeerClassification::AllGood);
         }
@@ -100,14 +100,12 @@ pub fn all_good_test(peer_stats: &PeerStats, _network: Network, probes_config: &
     return None;
 }
 
-
 pub fn get_classification(
     peer_stats: &Option<PeerStats>,
     peer_address: &SocketAddr,
     network: Network,
-    probes_config: &ProbeConfiguration
+    probes_config: &ProbeConfiguration,
 ) -> PeerClassification {
-
     // generic logic, rule out never having attempted this peer
     let peer_stats = match peer_stats {
         None => return PeerClassification::Unknown,
@@ -127,13 +125,21 @@ pub fn get_classification(
     }
 
     if let Some(merely) = merely_synced_test(peer_stats, network, &probes_config) {
-        if check_gating(peer_stats, network, &probes_config.merely_synced_gating_probes) {
+        if check_gating(
+            peer_stats,
+            network,
+            &probes_config.merely_synced_gating_probes,
+        ) {
             return merely;
         }
     }
 
     if let Some(maybe) = eventually_maybe_test(peer_stats, network, &probes_config) {
-        if check_gating(peer_stats, network, &probes_config.eventually_maybe_gating_probes) {
+        if check_gating(
+            peer_stats,
+            network,
+            &probes_config.eventually_maybe_gating_probes,
+        ) {
             return maybe;
         }
     }
@@ -148,8 +154,11 @@ pub fn get_classification(
     return PeerClassification::GenericBad;
 }
 
-
-pub fn merely_synced_test(peer_stats: &PeerStats, _network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
+pub fn merely_synced_test(
+    peer_stats: &PeerStats,
+    _network: Network,
+    probes_config: &ProbeConfiguration,
+) -> Option<PeerClassification> {
     if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
         // MerelySyncedEnough test section
         // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
@@ -164,7 +173,11 @@ pub fn merely_synced_test(peer_stats: &PeerStats, _network: Network, probes_conf
     return None;
 }
 
-pub fn eventually_maybe_test(peer_stats: &PeerStats, _network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
+pub fn eventually_maybe_test(
+    peer_stats: &PeerStats,
+    _network: Network,
+    probes_config: &ProbeConfiguration,
+) -> Option<PeerClassification> {
     if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
         // EventuallyMaybeSynced test section
         // if last protocol negotiation was more than 24 hours ago, this is not worth special attention, keep polling it at the slower rate
@@ -179,15 +192,24 @@ pub fn eventually_maybe_test(peer_stats: &PeerStats, _network: Network, probes_c
     return None;
 }
 
-pub fn beyond_useless_test(peer_stats: &PeerStats, _network: Network, probes_config: &ProbeConfiguration) -> Option<PeerClassification> {
+pub fn beyond_useless_test(
+    peer_stats: &PeerStats,
+    _network: Network,
+    probes_config: &ProbeConfiguration,
+) -> Option<PeerClassification> {
     if peer_stats.tcp_connection.attempt_count > probes_config.beyond_useless_count_threshold
-        && peer_stats.protocol_negotiation.success_count == 0 {
+        && peer_stats.protocol_negotiation.success_count == 0
+    {
         return Some(PeerClassification::BeyondUseless);
     }
     return None;
 }
 
-fn check_gating(peer_stats: &PeerStats, network: Network, gating_probes: &Vec<AugmentedProbeTypes>) -> bool {
+fn check_gating(
+    peer_stats: &PeerStats,
+    network: Network,
+    gating_probes: &Vec<AugmentedProbeTypes>,
+) -> bool {
     todo!();
 }
 
@@ -246,9 +268,6 @@ fn ancillary_checks_eventually_maybe_synced(
         return PeerClassification::EventuallyMaybeSynced;
     }
 }
-
-
-
 
 fn required_height(network: Network) -> Height {
     match network {

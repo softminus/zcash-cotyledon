@@ -1,18 +1,8 @@
-
 use std::time::{Duration, SystemTime};
 
 use futures_util::StreamExt;
 
-
-
-
-
-
-
-
-
 use crate::probe::classify::ProbeStat;
-
 
 #[derive(Debug, Clone, Copy)]
 pub struct EWMAPack {
@@ -30,7 +20,6 @@ pub struct EWMAState {
     pub count: f64,
     pub reliability: f64,
 }
-
 
 pub fn update_ewma_pack(
     prev: &mut EWMAPack,
@@ -65,7 +54,6 @@ fn update_ewma(prev: &mut EWMAState, sample_age: Duration, sample: bool) {
     prev.reliability = prev.reliability * weight_factor + sample_value * (1.0 - weight_factor);
 }
 
-
 impl Default for EWMAPack {
     fn default() -> Self {
         EWMAPack {
@@ -93,9 +81,13 @@ impl Default for EWMAPack {
     }
 }
 
-pub fn probe_stat_update(probe_stat: &mut ProbeStat, new_data_point: bool, new_poll_time: SystemTime) {
+pub fn probe_stat_update(
+    probe_stat: &mut ProbeStat,
+    new_data_point: bool,
+    new_poll_time: SystemTime,
+) {
     probe_stat.attempt_count += 1;
-    probe_stat.last_polled   = Some(new_poll_time);
+    probe_stat.last_polled = Some(new_poll_time);
     if new_data_point {
         probe_stat.success_count += 1;
         probe_stat.last_success = Some(new_poll_time);

@@ -1,27 +1,19 @@
-
 use std::net::SocketAddr;
 
 use std::time::Duration;
 
-
-
 use tower::Service;
 
-
-use tokio::time::{timeout};
-
+use tokio::time::timeout;
 
 use zebra_chain::parameters::Network;
 
+use zebra_network::{connect_isolated_tcp_direct, Request};
 
-
-use zebra_network::{
-    connect_isolated_tcp_direct, Request,
+use crate::probe::common::{
+    classify_zebra_network_errors, ErrorFlavor, PeerDerivedData, HASH_CHECKPOINTS_MAINNET,
+    HASH_CHECKPOINTS_TESTNET,
 };
-
-
-use crate::probe::common::{ErrorFlavor, classify_zebra_network_errors, PeerDerivedData};
-use crate::probe::common::{HASH_CHECKPOINTS_MAINNET, HASH_CHECKPOINTS_TESTNET};
 
 #[derive(Debug, Clone)]
 pub enum HeadersProbeResult {
@@ -40,9 +32,6 @@ pub enum HeadersProbeResult {
     // Nominal reply to the headers request
     HeadersOK(PeerDerivedData), // increment total_attempts and tcp_connections_ok and protocol_negotiations_ok and valid_headers_reply_ok
 }
-
-
-
 
 pub(super) async fn headers_probe_inner(
     peer_addr: SocketAddr,
@@ -153,4 +142,3 @@ pub(super) async fn headers_probe_inner(
         }
     }
 }
-

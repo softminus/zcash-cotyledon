@@ -15,9 +15,7 @@ use zebra_chain::parameters::Network;
 use zebra_chain::serialization::SerializationError;
 use zebra_consensus::CheckpointList;
 use zebra_network::types::PeerServices;
-use zebra_network::{
-    connect_isolated_tcp_direct, HandshakeError, Request, Version,
-};
+use zebra_network::{connect_isolated_tcp_direct, HandshakeError, Request, Version};
 
 use crate::probe::{ProbeResult, Timeouts};
 
@@ -193,8 +191,6 @@ pub fn classify_zebra_network_errors(
         returned_error
     ))
 }
-
-
 
 pub async fn peer_probe(
     peer_addr: SocketAddr,
