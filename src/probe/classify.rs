@@ -20,7 +20,6 @@ pub struct PeerStats {
     pub tcp_connection: ProbeStat,
     pub protocol_negotiation: ProbeStat,
     pub block_probe: ProbeStat,
-    pub header_probe: ProbeStat,
 
     pub peer_derived_data: Option<PeerDerivedData>,
 }
@@ -37,8 +36,6 @@ pub struct ProbeStat {
 #[derive(Debug, Clone)]
 pub enum GatingProbes {
     Block(Duration),
-    Headers(Duration),
-    Negotiation(Duration),
     NumericVersion(Vec<String>),
     UserAgent(Vec<String>),
     PeerHeight,
@@ -74,7 +71,6 @@ pub fn all_good_test(
 
         let probe_stat = match probes_config.ewma_probe {
             ProbeType::Block => peer_stats.block_probe,
-            ProbeType::Headers => peer_stats.header_probe,
             ProbeType::Negotiation => peer_stats.protocol_negotiation,
         };
         if probe_stat.attempt_count <= 3 && probe_stat.success_count * 2 >= probe_stat.attempt_count
@@ -216,12 +212,6 @@ fn check_gating(
         if !match probe {
             GatingProbes::Block(timeout) => {
                 gating_check_block(peer_stats, candidate_classification, network, timeout)
-            }
-            GatingProbes::Headers(timeout) => {
-                gating_check_headers(peer_stats, candidate_classification, network, timeout)
-            }
-            GatingProbes::Negotiation(timeout) => {
-                gating_check_negotiation(peer_stats, candidate_classification, network, timeout)
             }
             GatingProbes::NumericVersion(valid_versions) => {
                 gating_check_numeric_version(peer_stats, candidate_classification, network, valid_versions)

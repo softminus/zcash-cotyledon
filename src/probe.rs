@@ -2,7 +2,6 @@ pub mod block;
 pub mod classify;
 pub mod common;
 pub mod ewma;
-pub mod headers;
 pub mod protocol;
 
 use std::net::SocketAddr;
@@ -18,7 +17,6 @@ use zebra_network::types::MetaAddr;
 use crate::probe::block::{block_probe_inner, BlockProbeResult};
 use crate::probe::classify::PeerStats;
 use crate::probe::ewma::{probe_stat_update, update_ewma_pack};
-use crate::probe::headers::{headers_probe_inner, HeadersProbeResult};
 use crate::probe::protocol::{negotiation_probe_inner, NegotiationProbeResult};
 
 pub struct Timeouts {
@@ -47,7 +45,6 @@ pub enum ProbeResult {
 
 pub enum ProbeType {
     Block,
-    Headers,
     Negotiation,
 }
 
@@ -74,12 +71,6 @@ async fn probe_and_update(
                 block_probe_inner(proband_address, network, timeouts.hash_timeout).await;
             drop(permit);
             block_probe_update(probe_res, current_poll_time, &mut new_peer_stats)
-        }
-        ProbeType::Headers => {
-            let probe_res =
-                headers_probe_inner(proband_address, network, timeouts.hash_timeout).await;
-            drop(permit);
-            headers_probe_update(probe_res, current_poll_time, &mut new_peer_stats)
         }
         ProbeType::Negotiation => {
             let probe_res =
@@ -166,89 +157,6 @@ fn block_probe_update(
             update_ewma_pack(
                 &mut new_peer_stats.ewma_pack,
                 new_peer_stats.block_probe.last_polled,
-                current_poll_time,
-                true,
-            );
-            new_peer_stats.peer_derived_data = Some(new_peer_data);
-            return ProbeResult::Result(new_peer_stats.clone());
-        }
-    }
-}
-
-fn headers_probe_update(
-    probe_res: HeadersProbeResult,
-    current_poll_time: SystemTime,
-    new_peer_stats: &mut PeerStats,
-) -> ProbeResult {
-    match probe_res {
-        HeadersProbeResult::MustRetry => {
-            println!("Retry the connection!");
-            return ProbeResult::MustRetryProbe;
-        }
-        HeadersProbeResult::TCPFailure => {
-            probe_stat_update(&mut new_peer_stats.tcp_connection, false, current_poll_time);
-            probe_stat_update(
-                &mut new_peer_stats.protocol_negotiation,
-                false,
-                current_poll_time,
-            );
-            probe_stat_update(&mut new_peer_stats.header_probe, false, current_poll_time);
-
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.header_probe.last_polled,
-                current_poll_time,
-                false,
-            );
-            return ProbeResult::Result(new_peer_stats.clone());
-        }
-        HeadersProbeResult::ProtocolBad => {
-            probe_stat_update(&mut new_peer_stats.tcp_connection, true, current_poll_time);
-            probe_stat_update(
-                &mut new_peer_stats.protocol_negotiation,
-                false,
-                current_poll_time,
-            );
-            probe_stat_update(&mut new_peer_stats.header_probe, false, current_poll_time);
-
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.header_probe.last_polled,
-                current_poll_time,
-                false,
-            );
-            return ProbeResult::Result(new_peer_stats.clone());
-        }
-        HeadersProbeResult::HeadersFail(new_peer_data) => {
-            probe_stat_update(&mut new_peer_stats.tcp_connection, true, current_poll_time);
-            probe_stat_update(
-                &mut new_peer_stats.protocol_negotiation,
-                true,
-                current_poll_time,
-            );
-            probe_stat_update(&mut new_peer_stats.header_probe, false, current_poll_time);
-
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.header_probe.last_polled,
-                current_poll_time,
-                false,
-            );
-            new_peer_stats.peer_derived_data = Some(new_peer_data);
-            return ProbeResult::Result(new_peer_stats.clone());
-        }
-        HeadersProbeResult::HeadersOK(new_peer_data) => {
-            probe_stat_update(&mut new_peer_stats.tcp_connection, true, current_poll_time);
-            probe_stat_update(
-                &mut new_peer_stats.protocol_negotiation,
-                true,
-                current_poll_time,
-            );
-            probe_stat_update(&mut new_peer_stats.header_probe, true, current_poll_time);
-
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.header_probe.last_polled,
                 current_poll_time,
                 true,
             );
