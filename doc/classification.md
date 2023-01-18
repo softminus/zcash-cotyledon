@@ -24,7 +24,7 @@ The advertised numeric version must be equal to (or exceed) the configured numer
 
 ## User agent string test
 
-The user agent string must match the user-configured regular expression.
+The user agent string must match one of the the user-configured user agent strings.
 
 ## Peer height test
 
@@ -38,4 +38,4 @@ This is so a failure in the logic or probing mechanisms (or a network failure) d
 
 # Prospective logic
 
-If a node meets the numeric version number test and has a user agent string which matches the user agent regex, it's placed in the `EventuallyMaybeSynced` state, which allows it to be polled more often so it graduates to servable earlier.
+If a node meets the numeric version number test and has a user agent string which matches the user agent string test, it's placed in the `EventuallyMaybeSynced` state, which allows it to be polled more often so it graduates to servable earlier.
