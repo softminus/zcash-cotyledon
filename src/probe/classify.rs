@@ -42,7 +42,6 @@ pub enum GatingProbes {
 }
 
 pub struct ProbeConfiguration {
-    ewma_probe: ProbeType,
     all_good_gating_probes: Vec<GatingProbes>,
     merely_synced_gating_probes: Vec<GatingProbes>,
     eventually_maybe_gating_probes: Vec<GatingProbes>,
@@ -69,10 +68,8 @@ pub fn all_good_test(
         // AllGood test section
         let ewmas = peer_stats.ewma_pack;
 
-        let probe_stat = match probes_config.ewma_probe {
-            ProbeType::Block => peer_stats.block_probe,
-            ProbeType::Negotiation => peer_stats.protocol_negotiation,
-        };
+        let probe_stat = peer_stats.protocol_negotiation;
+
         if probe_stat.attempt_count <= 3 && probe_stat.success_count * 2 >= probe_stat.attempt_count
         {
             return Some(PeerClassification::AllGood);
