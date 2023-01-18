@@ -35,6 +35,7 @@ pub struct ProbeStat {
 
 #[derive(Debug, Clone)]
 pub enum GatingProbes {
+    Negotiation(Duration),
     Block(Duration),
     NumericVersion(Vec<String>),
     UserAgent(Vec<String>),
@@ -225,6 +226,10 @@ fn check_gating(
             GatingProbes::PeerHeight => {
                 gating_check_peer_height(peer_stats, candidate_classification, network)
             }
+            GatingProbes::Negotiation(timeout) => {
+                gating_check_negotiation(peer_stats, candidate_classification, network, timeout)
+            }
+
         } {
             return false;
         }
@@ -258,6 +263,16 @@ fn gating_check_user_agent(
 ) -> bool {
     todo!();
 }
+
+fn gating_check_negotiation(
+    peer_stats: &PeerStats,
+    candidate_classification: PeerClassification,
+    network: Network,
+    timeout: &Duration,
+) -> bool {
+    todo!();
+}
+
 
 fn gating_check_peer_height(
     peer_stats: &PeerStats,
