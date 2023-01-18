@@ -102,12 +102,6 @@ fn block_probe_update(
             );
             probe_stat_update(&mut new_peer_stats.block_probe, false, current_poll_time);
 
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.block_probe.last_polled,
-                current_poll_time,
-                false,
-            );
             return ProbeResult::Result(new_peer_stats.clone());
         }
         BlockProbeResult::ProtocolBad => {
@@ -119,12 +113,6 @@ fn block_probe_update(
             );
             probe_stat_update(&mut new_peer_stats.block_probe, false, current_poll_time);
 
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.block_probe.last_polled,
-                current_poll_time,
-                false,
-            );
             return ProbeResult::Result(new_peer_stats.clone());
         }
         BlockProbeResult::BlockRequestFail(new_peer_data) => {
@@ -136,12 +124,6 @@ fn block_probe_update(
             );
             probe_stat_update(&mut new_peer_stats.block_probe, false, current_poll_time);
 
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.block_probe.last_polled,
-                current_poll_time,
-                false,
-            );
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
         }
@@ -154,12 +136,6 @@ fn block_probe_update(
             );
             probe_stat_update(&mut new_peer_stats.block_probe, true, current_poll_time);
 
-            update_ewma_pack(
-                &mut new_peer_stats.ewma_pack,
-                new_peer_stats.block_probe.last_polled,
-                current_poll_time,
-                true,
-            );
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
         }
