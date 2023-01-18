@@ -235,24 +235,6 @@ fn gating_check_block(
     todo!();
 }
 
-fn gating_check_headers(
-    peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
-    network: Network,
-    timeout: &Duration,
-) -> bool {
-    todo!();
-}
-
-fn gating_check_negotiation(
-    peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
-    network: Network,
-    timeout: &Duration,
-) -> bool {
-    todo!();
-}
-
 fn gating_check_numeric_version(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
