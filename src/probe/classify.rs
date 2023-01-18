@@ -112,30 +112,36 @@ pub fn get_classification(
     }
 
     if let Some(all_good) = all_good_test(peer_stats, network, &probes_config) {
-        return check_gating(
+        if check_gating(
             peer_stats,
             all_good,
             network,
             &probes_config.all_good_gating_probes,
-        );
+        ) {
+            return all_good;
+        }
     }
 
     if let Some(merely) = merely_synced_test(peer_stats, network, &probes_config) {
-        return check_gating(
+        if check_gating(
             peer_stats,
             merely,
             network,
             &probes_config.merely_synced_gating_probes,
-        );
+        ) {
+            return merely;
+        }
     }
 
     if let Some(maybe) = eventually_maybe_test(peer_stats, network, &probes_config) {
-        return check_gating(
+        if check_gating(
             peer_stats,
             maybe,
             network,
             &probes_config.eventually_maybe_gating_probes,
-        );
+        ) {
+            return maybe;
+        }
     }
 
     if let Some(beyond_useless) = beyond_useless_test(peer_stats, network, &probes_config) {
@@ -204,7 +210,7 @@ fn check_gating(
     candidate_classification: PeerClassification,
     network: Network,
     gating_probes: &Vec<GatingProbes>,
-) -> PeerClassification {
+) -> bool {
     for probe in gating_probes {
         if !match probe {
             GatingProbes::Block(timeout) => {
@@ -220,10 +226,10 @@ fn check_gating(
                 gating_check_peer_height(peer_stats, candidate_classification, network)
             }
         } {
-            return PeerClassification::GenericBad;
+            return false;
         }
     }
-    return candidate_classification;
+    return true;
 }
 
 fn gating_check_block(
