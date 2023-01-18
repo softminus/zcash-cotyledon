@@ -1,3 +1,5 @@
+// if we have a node with an empty/invalidated block_probe, make sure to schedule a block probe ASAP
+
 
 // fn poll_this_time_around(
 //     peer_stats: &Option<PeerStats>,
