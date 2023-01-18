@@ -19,7 +19,7 @@ use zebra_network::{connect_isolated_tcp_direct, HandshakeError, Request, Versio
 
 use crate::probe::{ProbeResult, Timeouts};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PeerDerivedData {
     pub numeric_version: Version,
     pub peer_services: PeerServices,

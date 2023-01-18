@@ -15,7 +15,7 @@ use zebra_chain::parameters::Network;
 use zebra_network::types::MetaAddr;
 
 use crate::probe::block::{block_probe_inner, BlockProbeResult};
-use crate::probe::classify::PeerStats;
+use crate::probe::classify::{ProbeStat, PeerStats};
 use crate::probe::ewma::{probe_stat_update, update_ewma_pack};
 use crate::probe::protocol::{negotiation_probe_inner, NegotiationProbeResult};
 
@@ -198,6 +198,13 @@ fn negotiation_probe_update(
                 current_poll_time,
                 true,
             );
+            if let Some(old_peer_data) = &new_peer_stats.peer_derived_data {
+                if *old_peer_data != new_peer_data {
+                    println!("Invalidating block probe since peer metadata changed from {:?} to {:?}", old_peer_data, new_peer_data );
+                    let invalidated_block_probe: ProbeStat = Default::default();
+                    new_peer_stats.block_probe = invalidated_block_probe;
+                }
+            }
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
         }
