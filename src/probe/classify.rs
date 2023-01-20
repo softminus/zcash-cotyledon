@@ -53,6 +53,10 @@ pub struct ProbeConfiguration {
     beyond_useless_count_threshold: u64,
 }
 
+pub fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
+    return peer_address.port() == network.default_port();
+}
+
 pub fn all_good_test(
     peer_stats: &PeerStats,
     _network: Network,
@@ -151,43 +155,6 @@ pub fn get_classification(
     return PeerClassification::GenericBad;
 }
 
-// pub fn merely_synced_test(
-//     peer_stats: &PeerStats,
-//     _network: Network,
-//     probes_config: &ProbeConfiguration,
-// ) -> Option<PeerClassification> {
-//     if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
-//         // MerelySyncedEnough test section
-//         // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
-//         if let Some(last_block_success) = peer_stats.block_probe.last_success {
-//             if let Ok(duration) = last_block_success.elapsed() {
-//                 if duration <= probes_config.merely_synced_timeout {
-//                     return Some(PeerClassification::MerelySyncedEnough);
-//                 }
-//             }
-//         }
-//     }
-//     return None;
-// }
-
-// pub fn eventually_maybe_test(
-//     peer_stats: &PeerStats,
-//     _network: Network,
-//     probes_config: &ProbeConfiguration,
-// ) -> Option<PeerClassification> {
-//     if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
-//         // EventuallyMaybeSynced test section
-//         // if last protocol negotiation was more than 24 hours ago, this is not worth special attention, keep polling it at the slower rate
-//         if let Some(last_protocol_negotiation) = peer_stats.protocol_negotiation.last_success {
-//             if let Ok(duration) = last_protocol_negotiation.elapsed() {
-//                 if duration <= probes_config.eventually_synced_timeout {
-//                     return Some(PeerClassification::EventuallyMaybeSynced);
-//                 }
-//             }
-//         }
-//     }
-//     return None;
-// }
 
 pub fn beyond_useless_test(
     peer_stats: &PeerStats,
@@ -336,78 +303,112 @@ fn gating_check_relay_bit(
     return false;
 }
 
+// pub fn merely_synced_test(
+//     peer_stats: &PeerStats,
+//     _network: Network,
+//     probes_config: &ProbeConfiguration,
+// ) -> Option<PeerClassification> {
+//     if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+//         // MerelySyncedEnough test section
+//         // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
+//         if let Some(last_block_success) = peer_stats.block_probe.last_success {
+//             if let Ok(duration) = last_block_success.elapsed() {
+//                 if duration <= probes_config.merely_synced_timeout {
+//                     return Some(PeerClassification::MerelySyncedEnough);
+//                 }
+//             }
+//         }
+//     }
+//     return None;
+// }
+
+// pub fn eventually_maybe_test(
+//     peer_stats: &PeerStats,
+//     _network: Network,
+//     probes_config: &ProbeConfiguration,
+// ) -> Option<PeerClassification> {
+//     if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+//         // EventuallyMaybeSynced test section
+//         // if last protocol negotiation was more than 24 hours ago, this is not worth special attention, keep polling it at the slower rate
+//         if let Some(last_protocol_negotiation) = peer_stats.protocol_negotiation.last_success {
+//             if let Ok(duration) = last_protocol_negotiation.elapsed() {
+//                 if duration <= probes_config.eventually_synced_timeout {
+//                     return Some(PeerClassification::EventuallyMaybeSynced);
+//                 }
+//             }
+//         }
+//     }
+//     return None;
+// }
 
 
-fn ancillary_checks_all_good(
-    peer_derived_data: &PeerDerivedData,
-    peer_address: &SocketAddr,
-    peer_stats: &PeerStats,
-    network: Network,
-) -> PeerClassification {
-    if !peer_derived_data
-        .peer_services
-        .intersects(PeerServices::NODE_NETWORK)
-        || peer_derived_data.numeric_version < required_serving_version(network)
-        || peer_derived_data.peer_height < required_height(network)
-    {
-        println!("Classifying node {:?} as GenericBad despite meeting other AllGood criteria. PeerStats: {:?}", peer_address, peer_stats);
-        return PeerClassification::GenericBad;
-    } else {
-        return PeerClassification::AllGood;
-    }
-}
+// fn ancillary_checks_all_good(
+//     peer_derived_data: &PeerDerivedData,
+//     peer_address: &SocketAddr,
+//     peer_stats: &PeerStats,
+//     network: Network,
+// ) -> PeerClassification {
+//     if !peer_derived_data
+//         .peer_services
+//         .intersects(PeerServices::NODE_NETWORK)
+//         || peer_derived_data.numeric_version < required_serving_version(network)
+//         || peer_derived_data.peer_height < required_height(network)
+//     {
+//         println!("Classifying node {:?} as GenericBad despite meeting other AllGood criteria. PeerStats: {:?}", peer_address, peer_stats);
+//         return PeerClassification::GenericBad;
+//     } else {
+//         return PeerClassification::AllGood;
+//     }
+// }
 
-fn ancillary_checks_merely_synced(
-    peer_derived_data: &PeerDerivedData,
-    peer_address: &SocketAddr,
-    peer_stats: &PeerStats,
-    network: Network,
-) -> PeerClassification {
-    if !peer_derived_data
-        .peer_services
-        .intersects(PeerServices::NODE_NETWORK)
-        || peer_derived_data.numeric_version < required_serving_version(network)
-        || peer_derived_data.peer_height < required_height(network)
-    {
-        println!("Classifying node {:?} as GenericBad despite meeting other MerelySyncedEnough criteria. PeerStats: {:?}", peer_address, peer_stats);
-        return PeerClassification::GenericBad;
-    } else {
-        return PeerClassification::MerelySyncedEnough;
-    }
-}
+// fn ancillary_checks_merely_synced(
+//     peer_derived_data: &PeerDerivedData,
+//     peer_address: &SocketAddr,
+//     peer_stats: &PeerStats,
+//     network: Network,
+// ) -> PeerClassification {
+//     if !peer_derived_data
+//         .peer_services
+//         .intersects(PeerServices::NODE_NETWORK)
+//         || peer_derived_data.numeric_version < required_serving_version(network)
+//         || peer_derived_data.peer_height < required_height(network)
+//     {
+//         println!("Classifying node {:?} as GenericBad despite meeting other MerelySyncedEnough criteria. PeerStats: {:?}", peer_address, peer_stats);
+//         return PeerClassification::GenericBad;
+//     } else {
+//         return PeerClassification::MerelySyncedEnough;
+//     }
+// }
 
-fn ancillary_checks_eventually_maybe_synced(
-    peer_derived_data: &PeerDerivedData,
-    peer_address: &SocketAddr,
-    peer_stats: &PeerStats,
-    network: Network,
-) -> PeerClassification {
-    if !peer_derived_data
-        .peer_services
-        .intersects(PeerServices::NODE_NETWORK)
-        || peer_derived_data.numeric_version < required_serving_version(network)
-    {
-        println!("Classifying node {:?} as GenericBad despite meeting other EventuallyMaybeSynced criteria. PeerStats: {:?}", peer_address, peer_stats);
-        return PeerClassification::GenericBad;
-    } else {
-        return PeerClassification::EventuallyMaybeSynced;
-    }
-}
+// fn ancillary_checks_eventually_maybe_synced(
+//     peer_derived_data: &PeerDerivedData,
+//     peer_address: &SocketAddr,
+//     peer_stats: &PeerStats,
+//     network: Network,
+// ) -> PeerClassification {
+//     if !peer_derived_data
+//         .peer_services
+//         .intersects(PeerServices::NODE_NETWORK)
+//         || peer_derived_data.numeric_version < required_serving_version(network)
+//     {
+//         println!("Classifying node {:?} as GenericBad despite meeting other EventuallyMaybeSynced criteria. PeerStats: {:?}", peer_address, peer_stats);
+//         return PeerClassification::GenericBad;
+//     } else {
+//         return PeerClassification::EventuallyMaybeSynced;
+//     }
+// }
 
-fn required_height(network: Network) -> Height {
-    match network {
-        Network::Mainnet => *REQUIRED_MAINNET_HEIGHT,
-        Network::Testnet => *REQUIRED_TESTNET_HEIGHT,
-    }
-}
+// fn required_height(network: Network) -> Height {
+//     match network {
+//         Network::Mainnet => *REQUIRED_MAINNET_HEIGHT,
+//         Network::Testnet => *REQUIRED_TESTNET_HEIGHT,
+//     }
+// }
 
-fn required_serving_version(network: Network) -> Version {
-    match network {
-        Network::Mainnet => Version(170_100),
-        Network::Testnet => Version(170_040),
-    }
-}
+// fn required_serving_version(network: Network) -> Version {
+//     match network {
+//         Network::Mainnet => Version(170_100),
+//         Network::Testnet => Version(170_040),
+//     }
+// }
 
-pub fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
-    return peer_address.port() == network.default_port();
-}
