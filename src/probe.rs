@@ -55,6 +55,7 @@ async fn probe_and_update(
     timeouts: &Timeouts,
     random_delay: Duration,
     semaphore: Arc<Semaphore>,
+    probe_user_agent: String,
     probe_type: ProbeType,
 ) -> (SocketAddr, ProbeResult) {
     // we always return the SockAddr of the server we probed, so we can reissue queries
@@ -68,13 +69,13 @@ async fn probe_and_update(
     let probe_result_generic = match probe_type {
         ProbeType::Block => {
             let probe_res =
-                block_probe_inner(proband_address, network, timeouts.hash_timeout).await;
+                block_probe_inner(proband_address, network, timeouts.hash_timeout, probe_user_agent).await;
             drop(permit);
             block_probe_update(probe_res, current_poll_time, &mut new_peer_stats)
         }
         ProbeType::Negotiation => {
             let probe_res =
-                negotiation_probe_inner(proband_address, network, timeouts.hash_timeout).await;
+                negotiation_probe_inner(proband_address, network, timeouts.hash_timeout, probe_user_agent).await;
             drop(permit);
             negotiation_probe_update(probe_res, current_poll_time, &mut new_peer_stats)
         }

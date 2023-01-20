@@ -29,6 +29,7 @@ pub(super) async fn negotiation_probe_inner(
     peer_addr: SocketAddr,
     network: Network,
     connection_timeout: Duration,
+    probe_user_agent: String
 ) -> NegotiationProbeResult {
     println!(
         "Starting new protocol negotiation probe connection: peer addr is {:?}",
@@ -37,7 +38,7 @@ pub(super) async fn negotiation_probe_inner(
     let connection = connect_isolated_tcp_direct(
         network,
         peer_addr,
-        String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
+        probe_user_agent,
     );
     let connection = timeout(connection_timeout, connection);
     let connection = connection.await;

@@ -198,6 +198,7 @@ pub async fn peer_probe(
     timeouts: &Timeouts,
     random_delay: Duration,
     semaphore: Arc<Semaphore>,
+    probe_user_agent: String
 ) -> (SocketAddr, ProbeResult) {
     sleep(random_delay).await;
     let _permit = semaphore.acquire_owned().await.unwrap();
@@ -208,7 +209,7 @@ pub async fn peer_probe(
     let connection = connect_isolated_tcp_direct(
         network,
         peer_addr,
-        String::from("/Seeder-and-feeder:0.0.0-alpha0/"),
+        probe_user_agent,
     );
     let connection = timeout(timeouts.peers_timeout, connection);
     let connection = connection.await;
