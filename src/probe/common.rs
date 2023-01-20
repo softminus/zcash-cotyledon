@@ -24,8 +24,8 @@ pub struct PeerDerivedData {
     pub numeric_version: Version,
     pub peer_services: PeerServices,
     pub peer_height: Height,
-    pub _user_agent: String,
-    pub _relay: bool,
+    pub user_agent: String,
+    pub relay: bool,
 }
 
 pub static HASH_CHECKPOINTS_MAINNET: LazyLock<HashSet<Hash>> = LazyLock::new(|| {

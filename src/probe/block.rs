@@ -99,14 +99,14 @@ pub(super) async fn block_probe_inner(
                     let numeric_version = good_connection.connection_info.remote.version;
                     let peer_services = good_connection.connection_info.remote.services;
                     let peer_height = good_connection.connection_info.remote.start_height;
-                    let _user_agent = good_connection.connection_info.remote.user_agent.clone();
-                    let _relay = good_connection.connection_info.remote.relay;
+                    let user_agent = good_connection.connection_info.remote.user_agent.clone();
+                    let relay = good_connection.connection_info.remote.relay;
                     let peer_derived_data = PeerDerivedData {
                         numeric_version,
                         peer_services,
                         peer_height,
-                        _user_agent,
-                        _relay,
+                        user_agent,
+                        relay,
                     };
                     // println!("remote peer version: {:?}", z.connection_info.remote.version >= Version(170_100));
                     // println!("remote peer services: {:?}", z.connection_info.remote.services.intersects(PeerServices::NODE_NETWORK));
