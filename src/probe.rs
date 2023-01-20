@@ -2,6 +2,7 @@ pub mod block_probe;
 pub mod classify;
 pub mod common;
 pub mod ewma;
+pub mod interval_logic;
 pub mod negotiation_probe;
 
 use std::net::SocketAddr;
