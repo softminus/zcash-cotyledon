@@ -1,8 +1,8 @@
-pub mod block;
+pub mod block_probe;
 pub mod classify;
 pub mod common;
 pub mod ewma;
-pub mod protocol;
+pub mod negotiation_probe;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -14,10 +14,10 @@ use tokio::time::sleep;
 use zebra_chain::parameters::Network;
 use zebra_network::types::MetaAddr;
 
-use crate::probe::block::{block_probe_inner, BlockProbeResult};
+use crate::probe::block_probe::{block_probe_inner, BlockProbeResult};
 use crate::probe::classify::{ProbeStat, PeerStats};
 use crate::probe::ewma::{probe_stat_update, update_ewma_pack};
-use crate::probe::protocol::{negotiation_probe_inner, NegotiationProbeResult};
+use crate::probe::negotiation_probe::{negotiation_probe_inner, NegotiationProbeResult};
 
 pub struct Timeouts {
     pub hash_timeout: Duration,
