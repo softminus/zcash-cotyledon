@@ -40,6 +40,8 @@ pub enum GatingProbes {
     NumericVersion(Vec<Version>),
     UserAgent(Vec<String>),
     PeerHeight(Height),
+    PeerServicesBitmap(PeerServices),
+    RelayBit
 }
 
 pub struct ProbeConfiguration {
@@ -229,7 +231,12 @@ fn check_gating(
             GatingProbes::Negotiation(timeout) => {
                 gating_check_negotiation(peer_stats, candidate_classification, network, timeout)
             }
-
+            GatingProbes::PeerServicesBitmap(bitmap) => {
+                gating_check_services_bitmap(peer_stats, candidate_classification, network, bitmap)
+            }
+            GatingProbes::RelayBit => {
+                gating_check_relay_bit(peer_stats, candidate_classification, network)
+            }
         } {
             return false;
         }
@@ -318,6 +325,32 @@ fn gating_check_peer_height(
     }
     return false;
 }
+
+fn gating_check_services_bitmap(
+    peer_stats: &PeerStats,
+    candidate_classification: PeerClassification,
+    network: Network,
+    bitmap: &PeerServices
+) -> bool {
+    if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        return peer_derived_data.peer_services.intersects(*bitmap);
+    }
+    return false;
+}
+
+
+fn gating_check_relay_bit(
+    peer_stats: &PeerStats,
+    candidate_classification: PeerClassification,
+    network: Network
+) -> bool {
+    if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        return peer_derived_data.relay;
+    }
+    return false;
+}
+
+
 
 fn ancillary_checks_all_good(
     peer_derived_data: &PeerDerivedData,
