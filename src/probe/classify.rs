@@ -117,7 +117,6 @@ pub fn get_classification(
     if let Some(all_good) = all_good_test(peer_stats, network, &probes_config) {
         if check_gating(
             peer_stats,
-            all_good,
             network,
             &probes_config.all_good_gating_probes,
         ) {
@@ -210,32 +209,31 @@ pub fn beyond_useless_test(
 
 fn check_gating(
     peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
     network: Network,
     gating_probes: &Vec<GatingProbes>,
 ) -> bool {
     for probe in gating_probes {
         if !match probe {
             GatingProbes::Block(timeout) => {
-                gating_check_block(peer_stats, candidate_classification, network, timeout)
+                gating_check_block(peer_stats, network, timeout)
             }
             GatingProbes::NumericVersion(valid_versions) => {
-                gating_check_numeric_version(peer_stats, candidate_classification, network, valid_versions)
+                gating_check_numeric_version(peer_stats, network, valid_versions)
             }
             GatingProbes::UserAgent(valid_user_agents) => {
-                gating_check_user_agent(peer_stats, candidate_classification, network, valid_user_agents)
+                gating_check_user_agent(peer_stats, network, valid_user_agents)
             }
             GatingProbes::PeerHeight(required_height) => {
-                gating_check_peer_height(peer_stats, candidate_classification, network, required_height)
+                gating_check_peer_height(peer_stats, network, required_height)
             }
             GatingProbes::Negotiation(timeout) => {
-                gating_check_negotiation(peer_stats, candidate_classification, network, timeout)
+                gating_check_negotiation(peer_stats, network, timeout)
             }
             GatingProbes::PeerServicesBitmap(bitmap) => {
-                gating_check_services_bitmap(peer_stats, candidate_classification, network, bitmap)
+                gating_check_services_bitmap(peer_stats, network, bitmap)
             }
             GatingProbes::RelayBit => {
-                gating_check_relay_bit(peer_stats, candidate_classification, network)
+                gating_check_relay_bit(peer_stats, network)
             }
         } {
             return false;
@@ -246,7 +244,6 @@ fn check_gating(
 
 fn gating_check_block(
     peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
     network: Network,
     timeout: &Duration,
 ) -> bool {
@@ -264,7 +261,6 @@ fn gating_check_block(
 
 fn gating_check_numeric_version(
     peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
     network: Network,
     valid_versions: &Vec<Version>,
 ) -> bool {
@@ -280,7 +276,6 @@ fn gating_check_numeric_version(
 
 fn gating_check_user_agent(
     peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
     network: Network,
     valid_user_agents: &Vec<String>,
 ) -> bool {
@@ -295,7 +290,6 @@ fn gating_check_user_agent(
 }
 fn gating_check_negotiation(
     peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
     network: Network,
     timeout: &Duration,
 ) -> bool {
@@ -314,7 +308,6 @@ fn gating_check_negotiation(
 
 fn gating_check_peer_height(
     peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
     network: Network,
     required_height: &Height
 ) -> bool {
@@ -328,7 +321,6 @@ fn gating_check_peer_height(
 
 fn gating_check_services_bitmap(
     peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
     network: Network,
     bitmap: &PeerServices
 ) -> bool {
@@ -341,7 +333,6 @@ fn gating_check_services_bitmap(
 
 fn gating_check_relay_bit(
     peer_stats: &PeerStats,
-    candidate_classification: PeerClassification,
     network: Network
 ) -> bool {
     if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
