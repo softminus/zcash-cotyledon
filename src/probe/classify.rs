@@ -243,7 +243,16 @@ fn gating_check_block(
     network: Network,
     timeout: &Duration,
 ) -> bool {
-    todo!();
+    if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        if let Some(last_block_success) = peer_stats.block_probe.last_success {
+            if let Ok(duration) = last_block_success.elapsed() {
+                if duration <= *timeout {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 fn gating_check_numeric_version(
