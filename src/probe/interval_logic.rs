@@ -113,7 +113,7 @@ fn probe_schedule_for_node(
 }
 
 fn peer_last_polled_comparison(peer_stats: &PeerStats, duration_threshold: Duration) -> bool {
-    match peer_stats.last_polled {
+    match peer_stats.protocol_negotiation.last_polled {
         None => true,
         Some(previous_polling_time) => {
             match SystemTime::now().duration_since(previous_polling_time) {
@@ -130,8 +130,8 @@ fn exponential_acquisition_threshold_secs(
     attempts_cap: u64,
     final_duration: Duration,
 ) -> Duration {
-    if peer_stats.total_attempts < attempts_cap {
-        Duration::from_secs(peer_stats.total_attempts * base_duration.as_secs())
+    if peer_stats.protocol_negotiation.attempt_count < attempts_cap {
+        Duration::from_secs(peer_stats.protocol_negotiation.attempt_count * base_duration.as_secs())
     } else {
         final_duration
     }
