@@ -124,26 +124,21 @@ pub fn get_classification(
         }
     }
 
-    if let Some(merely) = merely_synced_test(peer_stats, network, &probes_config) {
-        if check_gating(
-            peer_stats,
-            merely,
-            network,
-            &probes_config.merely_synced_gating_probes,
-        ) {
-            return merely;
-        }
+    if check_gating(
+        peer_stats,
+        network,
+        &probes_config.merely_synced_gating_probes,
+    ) {
+        return PeerClassification::MerelySyncedEnough;
     }
 
-    if let Some(maybe) = eventually_maybe_test(peer_stats, network, &probes_config) {
-        if check_gating(
-            peer_stats,
-            maybe,
-            network,
-            &probes_config.eventually_maybe_gating_probes,
-        ) {
-            return maybe;
-        }
+
+    if check_gating(
+        peer_stats,
+        network,
+        &probes_config.eventually_maybe_gating_probes,
+    ) {
+        return PeerClassification::EventuallyMaybeSynced;
     }
 
     if let Some(beyond_useless) = beyond_useless_test(peer_stats, network, &probes_config) {
@@ -156,43 +151,43 @@ pub fn get_classification(
     return PeerClassification::GenericBad;
 }
 
-pub fn merely_synced_test(
-    peer_stats: &PeerStats,
-    _network: Network,
-    probes_config: &ProbeConfiguration,
-) -> Option<PeerClassification> {
-    if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
-        // MerelySyncedEnough test section
-        // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
-        if let Some(last_block_success) = peer_stats.block_probe.last_success {
-            if let Ok(duration) = last_block_success.elapsed() {
-                if duration <= probes_config.merely_synced_timeout {
-                    return Some(PeerClassification::MerelySyncedEnough);
-                }
-            }
-        }
-    }
-    return None;
-}
+// pub fn merely_synced_test(
+//     peer_stats: &PeerStats,
+//     _network: Network,
+//     probes_config: &ProbeConfiguration,
+// ) -> Option<PeerClassification> {
+//     if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+//         // MerelySyncedEnough test section
+//         // if it doesn't meet the uptime criteria but it passed the blocks test in the past 2 hours, serve it as an alternate
+//         if let Some(last_block_success) = peer_stats.block_probe.last_success {
+//             if let Ok(duration) = last_block_success.elapsed() {
+//                 if duration <= probes_config.merely_synced_timeout {
+//                     return Some(PeerClassification::MerelySyncedEnough);
+//                 }
+//             }
+//         }
+//     }
+//     return None;
+// }
 
-pub fn eventually_maybe_test(
-    peer_stats: &PeerStats,
-    _network: Network,
-    probes_config: &ProbeConfiguration,
-) -> Option<PeerClassification> {
-    if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
-        // EventuallyMaybeSynced test section
-        // if last protocol negotiation was more than 24 hours ago, this is not worth special attention, keep polling it at the slower rate
-        if let Some(last_protocol_negotiation) = peer_stats.protocol_negotiation.last_success {
-            if let Ok(duration) = last_protocol_negotiation.elapsed() {
-                if duration <= probes_config.eventually_synced_timeout {
-                    return Some(PeerClassification::EventuallyMaybeSynced);
-                }
-            }
-        }
-    }
-    return None;
-}
+// pub fn eventually_maybe_test(
+//     peer_stats: &PeerStats,
+//     _network: Network,
+//     probes_config: &ProbeConfiguration,
+// ) -> Option<PeerClassification> {
+//     if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+//         // EventuallyMaybeSynced test section
+//         // if last protocol negotiation was more than 24 hours ago, this is not worth special attention, keep polling it at the slower rate
+//         if let Some(last_protocol_negotiation) = peer_stats.protocol_negotiation.last_success {
+//             if let Ok(duration) = last_protocol_negotiation.elapsed() {
+//                 if duration <= probes_config.eventually_synced_timeout {
+//                     return Some(PeerClassification::EventuallyMaybeSynced);
+//                 }
+//             }
+//         }
+//     }
+//     return None;
+// }
 
 pub fn beyond_useless_test(
     peer_stats: &PeerStats,
