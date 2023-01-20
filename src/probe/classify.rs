@@ -259,9 +259,16 @@ fn gating_check_numeric_version(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
-    valid_versions: &Vec<String>,
+    valid_versions: &Vec<Version>,
 ) -> bool {
-    todo!();
+    if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        for valid_ver in valid_versions {
+            if peer_derived_data.numeric_version == *valid_ver {
+                return true
+            }
+        }
+    }
+    return false;
 }
 
 fn gating_check_user_agent(
@@ -270,16 +277,31 @@ fn gating_check_user_agent(
     network: Network,
     valid_user_agents: &Vec<String>,
 ) -> bool {
-    todo!();
+    if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        for valid_ua in valid_user_agents {
+            if peer_derived_data.user_agent == *valid_ua {
+                return true
+            }
+        }
+    }
+    return false;
 }
-
 fn gating_check_negotiation(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
     timeout: &Duration,
 ) -> bool {
-    todo!();
+    if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        if let Some(last_protocol_negotiation) = peer_stats.protocol_negotiation.last_success {
+            if let Ok(duration) = last_protocol_negotiation.elapsed() {
+                if duration <= *timeout {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 
@@ -287,8 +309,14 @@ fn gating_check_peer_height(
     peer_stats: &PeerStats,
     candidate_classification: PeerClassification,
     network: Network,
+    required_height: &Height
 ) -> bool {
-    todo!();
+    if let Some(peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        if peer_derived_data.peer_height >= *required_height {
+            return true;
+        }
+    }
+    return false;
 }
 
 fn ancillary_checks_all_good(
