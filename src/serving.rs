@@ -20,6 +20,7 @@ pub fn update_serving_nodes(
     internal_peer_tracker: &HashMap<SocketAddr, Option<PeerStats>>,
     probes_config: &ProbeConfiguration,
 ) {
+    // FIXME: add an assert here that this function does nothing
     let mut primary_nodes = HashSet::new();
     let mut alternate_nodes = HashSet::new();
 
