@@ -34,8 +34,9 @@ fn probe_schedule_for_node(
     peer_stats: &Option<PeerStats>,
     peer_address: &SocketAddr,
     network: Network,
+    probes_config: &ProbeConfiguration,
 ) -> Vec<ProbeType> {
-    let peer_classification = get_classification(peer_stats, peer_address, network);
+    let peer_classification = get_classification(peer_stats, peer_address, network, probes_config);
     match peer_classification {
         PeerClassification::Unknown => {
             println!(
@@ -55,7 +56,8 @@ fn probe_schedule_for_node(
                 "node {:?} is BeyondUseless, we try it again in {:?}",
                 peer_address, threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
+            vec![ProbeType::Block]
         }
         PeerClassification::GenericBad => {
             let threshold = exponential_acquisition_threshold_secs(
@@ -68,7 +70,8 @@ fn probe_schedule_for_node(
                 "node {:?} is GenericBad, we try it again in {:?}",
                 peer_address, threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
+            vec![ProbeType::Block]
         }
         PeerClassification::EventuallyMaybeSynced => {
             let threshold = exponential_acquisition_threshold_secs(
@@ -81,7 +84,8 @@ fn probe_schedule_for_node(
                 "node {:?} is EventuallyMaybeSynced, we try it again in {:?}",
                 peer_address, threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
+            vec![ProbeType::Block]
         }
         PeerClassification::MerelySyncedEnough => {
             let threshold = exponential_acquisition_threshold_secs(
@@ -94,7 +98,8 @@ fn probe_schedule_for_node(
                 "node {:?} is MerelySyncedEnough, we try it again in {:?}",
                 peer_address, threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
+            vec![ProbeType::Block]
         }
         PeerClassification::AllGood => {
             let threshold = exponential_acquisition_threshold_secs(
@@ -107,7 +112,8 @@ fn probe_schedule_for_node(
                 "node {:?} is AllGood, we try it again in {:?}",
                 peer_address, threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold)
+            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
+            vec![ProbeType::Block]
         }
     }
 }
