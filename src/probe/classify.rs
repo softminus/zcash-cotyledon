@@ -19,6 +19,7 @@ pub struct PeerStats {
 
     pub tcp_connection: ProbeStat,
     pub protocol_negotiation: ProbeStat,
+    pub block_probe_valid: bool,
     pub block_probe: ProbeStat,
 
     pub peer_derived_data: Option<PeerDerivedData>,
@@ -213,7 +214,7 @@ fn gating_check_block(
         if let Some(last_block_success) = peer_stats.block_probe.last_success {
             if let Ok(duration) = last_block_success.elapsed() {
                 if duration <= *timeout {
-                    return true;
+                    return peer_stats.block_probe_valid;
                 }
             }
         }

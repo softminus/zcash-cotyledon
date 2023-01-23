@@ -103,7 +103,7 @@ fn block_probe_update(
                 current_poll_time,
             );
             probe_stat_update(&mut new_peer_stats.block_probe, false, current_poll_time);
-
+            new_peer_stats.block_probe_valid = true;
             return ProbeResult::Result(new_peer_stats.clone());
         }
         BlockProbeResult::ProtocolBad => {
@@ -114,6 +114,7 @@ fn block_probe_update(
                 current_poll_time,
             );
             probe_stat_update(&mut new_peer_stats.block_probe, false, current_poll_time);
+            new_peer_stats.block_probe_valid = true;
 
             return ProbeResult::Result(new_peer_stats.clone());
         }
@@ -125,6 +126,7 @@ fn block_probe_update(
                 current_poll_time,
             );
             probe_stat_update(&mut new_peer_stats.block_probe, false, current_poll_time);
+            new_peer_stats.block_probe_valid = true;
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
@@ -137,6 +139,7 @@ fn block_probe_update(
                 current_poll_time,
             );
             probe_stat_update(&mut new_peer_stats.block_probe, true, current_poll_time);
+            new_peer_stats.block_probe_valid = true;
 
             new_peer_stats.peer_derived_data = Some(new_peer_data);
             return ProbeResult::Result(new_peer_stats.clone());
@@ -203,8 +206,7 @@ fn negotiation_probe_update(
             if let Some(old_peer_data) = &new_peer_stats.peer_derived_data {
                 if *old_peer_data != new_peer_data {
                     println!("Invalidating block probe since peer metadata changed from {:?} to {:?}", old_peer_data, new_peer_data );
-                    let invalidated_block_probe: ProbeStat = Default::default();
-                    new_peer_stats.block_probe = invalidated_block_probe;
+                    new_peer_stats.block_probe_valid = false;
                 }
             }
             new_peer_stats.peer_derived_data = Some(new_peer_data);
