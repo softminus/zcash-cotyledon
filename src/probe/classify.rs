@@ -53,6 +53,7 @@ pub struct ProbeConfiguration {
     merely_synced_timeout: Duration,
     eventually_synced_timeout: Duration,
     beyond_useless_count_threshold: u64,
+    beyond_useless_age_threshold: Duration,
 }
 
 pub fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
@@ -163,10 +164,18 @@ pub fn beyond_useless_test(
     _network: Network,
     probes_config: &ProbeConfiguration,
 ) -> Option<PeerClassification> {
-    if peer_stats.tcp_connection.attempt_count > probes_config.beyond_useless_count_threshold
-        && peer_stats.protocol_negotiation.success_count == 0
-    {
-        return Some(PeerClassification::BeyondUseless);
+    if peer_stats.tcp_connection.attempt_count > probes_config.beyond_useless_count_threshold { // only put nodes into BeyondUseless if we've tried enough times
+        if peer_stats.protocol_negotiation.success_count == 0 { // and if we've never been able to negotiate the protocol with them
+            return Some(PeerClassification::BeyondUseless);
+        }
+
+        if let Some(last_protocol_success) = peer_stats.protocol_negotiation.last_success { // or if the last successful protocol negotiation was a really long time ago
+            if let Ok(duration) = last_protocol_success.elapsed() {
+                if duration <= probes_config.beyond_useless_age_threshold {
+                    return Some(PeerClassification::BeyondUseless);
+                }
+            }
+        }
     }
     return None;
 }
