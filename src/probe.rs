@@ -50,7 +50,7 @@ pub enum ProbeType {
     Negotiation,
 }
 
-async fn probe_and_update(
+pub async fn probe_and_update(
     proband_address: SocketAddr,
     old_stats: Option<PeerStats>,
     network: Network,

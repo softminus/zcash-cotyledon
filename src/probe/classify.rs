@@ -47,13 +47,13 @@ pub enum GatingProbes {
 }
 
 pub struct ProbeConfiguration {
-    all_good_gating_probes: Vec<GatingProbes>,
-    merely_synced_gating_probes: Vec<GatingProbes>,
-    eventually_maybe_gating_probes: Vec<GatingProbes>,
-    merely_synced_timeout: Duration,
-    eventually_synced_timeout: Duration,
-    beyond_useless_count_threshold: u64,
-    beyond_useless_age_threshold: Duration,
+    pub all_good_gating_probes: Vec<GatingProbes>,
+    pub merely_synced_gating_probes: Vec<GatingProbes>,
+    pub eventually_maybe_gating_probes: Vec<GatingProbes>,
+    pub merely_synced_timeout: Duration,
+    pub eventually_synced_timeout: Duration,
+    pub beyond_useless_count_threshold: u64,
+    pub beyond_useless_age_threshold: Duration,
 }
 
 pub fn dns_servable(peer_address: SocketAddr, network: Network) -> bool {
