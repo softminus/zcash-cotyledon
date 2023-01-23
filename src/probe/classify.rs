@@ -38,6 +38,7 @@ pub struct ProbeStat {
 pub enum GatingProbes {
     Negotiation(Duration),
     Block(Duration),
+    BlockLenient(Duration),
     NumericVersion(Vec<Version>),
     UserAgent(Vec<String>),
     PeerHeight(Height),
@@ -180,6 +181,9 @@ fn check_gating(
             GatingProbes::Block(timeout) => {
                 gating_check_block(peer_stats, network, timeout)
             }
+            GatingProbes::BlockLenient(timeout) => {
+                gating_check_block_lenient(peer_stats, network, timeout)
+            }
             GatingProbes::NumericVersion(valid_versions) => {
                 gating_check_numeric_version(peer_stats, network, valid_versions)
             }
@@ -215,6 +219,24 @@ fn gating_check_block(
             if let Ok(duration) = last_block_success.elapsed() {
                 if duration <= *timeout {
                     return peer_stats.block_probe_valid;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+
+fn gating_check_block_lenient(
+    peer_stats: &PeerStats,
+    network: Network,
+    timeout: &Duration,
+) -> bool {
+    if let Some(_peer_derived_data) = peer_stats.peer_derived_data.as_ref() {
+        if let Some(last_block_success) = peer_stats.block_probe.last_success {
+            if let Ok(duration) = last_block_success.elapsed() {
+                if duration <= *timeout {
+                    return true;
                 }
             }
         }
