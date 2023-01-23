@@ -44,6 +44,7 @@ pub enum ProbeResult {
     MustRetryPeers,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ProbeType {
     Block,
     Negotiation,

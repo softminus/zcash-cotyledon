@@ -27,9 +27,6 @@ use crate::probe::classify::{get_classification, PeerStats, ProbeConfiguration};
 use crate::probe::PeerClassification;
 use crate::probe::ProbeType;
 
-// if we have a node with an empty/invalidated block_probe, make sure to schedule a block probe ASAP
-
-
 fn probe_schedule_for_node(
     peer_stats: &Option<PeerStats>,
     peer_address: &SocketAddr,
@@ -43,7 +40,7 @@ fn probe_schedule_for_node(
                 "node {:?} is Unknown, we try it this time around",
                 peer_address
             );           
-            vec![ProbeType::Block] // never tried a connection, so let's give it a try
+            return vec![ProbeType::Block]; // never tried a connection, so let's give it a try now
         }
         PeerClassification::BeyondUseless => {
             let threshold = exponential_acquisition_threshold_secs(
@@ -52,12 +49,16 @@ fn probe_schedule_for_node(
                 16,                          // number of attempts in exponential warmup
                 Duration::from_secs(60 * 60 * 16), // final duration: 16 hours
             );
+
             println!(
                 "node {:?} is BeyondUseless, we try it again in {:?}",
                 peer_address, threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
-            vec![ProbeType::Block]
+            if peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold) {
+               return vec![ProbeType::Block];
+            } else {
+                return vec![];
+            }
         }
         PeerClassification::GenericBad => {
             let threshold = exponential_acquisition_threshold_secs(
@@ -70,8 +71,11 @@ fn probe_schedule_for_node(
                 "node {:?} is GenericBad, we try it again in {:?}",
                 peer_address, threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
-            vec![ProbeType::Block]
+            if peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold) {
+               return vec![ProbeType::Block];
+            } else {
+                return vec![];
+            }
         }
         PeerClassification::EventuallyMaybeSynced => {
             let threshold = exponential_acquisition_threshold_secs(
@@ -84,36 +88,90 @@ fn probe_schedule_for_node(
                 "node {:?} is EventuallyMaybeSynced, we try it again in {:?}",
                 peer_address, threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
-            vec![ProbeType::Block]
+            if peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold) {
+               return vec![ProbeType::Block];
+            } else {
+                return vec![];
+            }
         }
         PeerClassification::MerelySyncedEnough => {
-            let threshold = exponential_acquisition_threshold_secs(
+            let heavyweight_threshold = exponential_acquisition_threshold_secs(
                 peer_stats.as_ref().unwrap(),
-                Duration::from_secs(60 * 2),  // base duration: 2 minutes
+                Duration::from_secs(60 * 4),  // base duration: 4 minutes
                 16,                           // number of attempts in exponential warmup
-                Duration::from_secs(60 * 30), // final duration: 30 minutes
+                Duration::from_secs(60 * 60), // final duration: 60 minutes
             );
+
+            let lightweight_threshold = exponential_acquisition_threshold_secs(
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(60 * 1),  // base duration: 1 minute
+                16,                           // number of attempts in exponential warmup
+                Duration::from_secs(60 * 15), // final duration: 15 minutes
+            );
+
             println!(
-                "node {:?} is MerelySyncedEnough, we try it again in {:?}",
-                peer_address, threshold
+                "node {:?} is MerelySyncedEnough, we try lightweight probe again in {:?}",
+                peer_address, lightweight_threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
-            vec![ProbeType::Block]
+
+            println!(
+                "node {:?} is MerelySyncedEnough, we try heavyweight probe again in {:?}",
+                peer_address, heavyweight_threshold
+            );
+
+            let mut probes = Vec::new();
+            if peer_last_polled_comparison(peer_stats.as_ref().unwrap(), lightweight_threshold) {
+                probes.push(ProbeType::Negotiation);
+            }
+            if peer_last_polled_comparison(peer_stats.as_ref().unwrap(), heavyweight_threshold) {
+                probes.push(ProbeType::Block);
+            }
+
+            if peer_stats.as_ref().unwrap().block_probe_valid == false {
+                if !probes.contains(&ProbeType::Block) {
+                    probes.push(ProbeType::Block);
+                }
+            }
+            return probes;
         }
         PeerClassification::AllGood => {
-            let threshold = exponential_acquisition_threshold_secs(
+            let heavyweight_threshold = exponential_acquisition_threshold_secs(
                 peer_stats.as_ref().unwrap(),
-                Duration::from_secs(60 * 2),  // base duration: 2 minutes
+                Duration::from_secs(60 * 4),  // base duration: 4 minutes
                 16,                           // number of attempts in exponential warmup
-                Duration::from_secs(60 * 30), // final duration: 30 minutes
+                Duration::from_secs(60 * 60), // final duration: 60 minutes
             );
+
+            let lightweight_threshold = exponential_acquisition_threshold_secs(
+                peer_stats.as_ref().unwrap(),
+                Duration::from_secs(60 * 1),  // base duration: 1 minute
+                16,                           // number of attempts in exponential warmup
+                Duration::from_secs(60 * 15), // final duration: 15 minutes
+            );
+
             println!(
-                "node {:?} is AllGood, we try it again in {:?}",
-                peer_address, threshold
+                "node {:?} is AllGood, we try lightweight probe again in {:?}",
+                peer_address, lightweight_threshold
             );
-            peer_last_polled_comparison(peer_stats.as_ref().unwrap(), threshold);
-            vec![ProbeType::Block]
+
+            println!(
+                "node {:?} is AllGood, we try heavyweight probe again in {:?}",
+                peer_address, heavyweight_threshold
+            );
+
+            let mut probes = Vec::new();
+            if peer_last_polled_comparison(peer_stats.as_ref().unwrap(), lightweight_threshold) {
+                probes.push(ProbeType::Negotiation);
+            }
+            if peer_last_polled_comparison(peer_stats.as_ref().unwrap(), heavyweight_threshold) {
+                probes.push(ProbeType::Block);
+            }
+            if peer_stats.as_ref().unwrap().block_probe_valid == false {
+                if !probes.contains(&ProbeType::Block) {
+                    probes.push(ProbeType::Block);
+                }
+            }
+            return probes;
         }
     }
 }
